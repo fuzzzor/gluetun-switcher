@@ -7,8 +7,8 @@ WORKDIR /usr/src/app
 # Copy package manifest files
 COPY package*.json ./
 
-# Install build tools needed for native dependencies on Alpine
-RUN apk add --no-cache g++ make python3 linux-headers
+# Update/Upgrade Alpine packages and install build tools
+RUN apk -U upgrade && apk add --no-cache g++ make python3 linux-headers
 
 # Install production dependencies
 RUN npm install --production

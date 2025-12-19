@@ -9,11 +9,11 @@
   "author": "Utilisateur",
   "license": "MIT",
   "dependencies": {
-    "conf": "^13.0.0",
+    "conf": "^15.0.2",
     "cors": "^2.8.5",
-    "dockerode": "^4.0.2",
+    "dockerode": "^4.0.9",
     "dotenv": "^17.2.3",
-    "express": "^4.21.2"
+    "express": "^5.2.1"
   },
   "repository": {
     "type": "git",
