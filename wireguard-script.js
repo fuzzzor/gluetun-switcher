@@ -179,23 +179,34 @@ function initializeEventListeners() {
     document.querySelectorAll('[data-collapsible]').forEach(header => {
         const contentId = header.getAttribute('data-collapsible');
         const content = document.getElementById(contentId);
+        const toggleButton = header.querySelector('.collapse-toggle');
         const toggleIcon = header.querySelector('.collapse-toggle i');
 
-        if (content) {
-            // Collapse history by default
-            if (contentId === 'historyContent') {
-                content.classList.add('collapsed');
-                toggleIcon.classList.add('rotated');
-            }
+        if (!content || !toggleButton || !toggleIcon) return;
 
-            header.addEventListener('click', (e) => {
-                // Prevent clicks on buttons inside the header from triggering collapse
-                if (e.target.closest('button')) return;
-
-                content.classList.toggle('collapsed');
-                toggleIcon.classList.toggle('rotated');
-            });
+        // Collapse history by default
+        if (contentId === 'historyContent') {
+            content.classList.add('collapsed');
+            toggleIcon.classList.add('rotated');
         }
+
+        const toggle = () => {
+            content.classList.toggle('collapsed');
+            toggleIcon.classList.toggle('rotated');
+        };
+
+        // Click on header (excluding button)
+        header.addEventListener('click', (e) => {
+            if (e.target.closest('.collapse-toggle')) return;
+            toggle();
+        });
+
+        // Click directly on chevron button
+        toggleButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggle();
+        });
     });
 }
 

@@ -4,7 +4,11 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs').promises;
 const Docker = require('dockerode');
-// electron-store will be imported dynamically for ESM compatibility
+const session = require('express-session');
+const authService = require('./auth/auth.service');
+const security = require('./config/security.config');
+const http = require('http');
+const https = require('https');
 
 const app = express();
 const port = 3003;
@@ -16,10 +20,93 @@ async function startServer() {
 
 // Middlewares
 app.use(cors());
-app.use(express.json()); // To parse JSON in POST requests
+app.use(express.json());
+
+app.use(session({
+  name: security.sessionName,
+  secret: security.sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    sameSite: 'strict',
+    secure: security.httpsEnabled
+  }
+}));
+
+// Initialize admin password on startup
+authService.ensureAdminPasswordInitialized();
 
 // --- API Routes ---
 // Declared before static files to give them priority.
+
+// Authentication routes
+
+// Get current logged user
+app.get('/api/auth/me', (req, res) => {
+  if (!req.session.user) {
+    return res.status(401).json({ success: false });
+  }
+  res.json({ success: true, username: req.session.user.username });
+});
+
+// Logout
+app.post('/api/auth/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.json({ success: true });
+  });
+});
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const result = await authService.authenticate(username, password);
+    if (!result.success) {
+      return res.status(401).json({ success: false, locked: result.locked || false });
+    }
+    req.session.user = { username };
+    req.session.mustChangePassword = !!result.mustChangePassword;
+    res.json({ success: true, mustChangePassword: result.mustChangePassword, noPassword: !!result.noPassword });
+  } catch (e) {
+    res.status(500).json({ success: false });
+  }
+});
+
+app.post('/api/auth/change-password', async (req, res) => {
+  if (!req.session.user || !req.session.mustChangePassword) {
+    return res.status(403).json({ success: false, error: 'not_allowed' });
+  }
+  try {
+    await authService.changePassword(req.session.user.username, req.body.newPassword);
+    req.session.mustChangePassword = false;
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ success: false, error: e.message });
+  }
+});
+
+// Protect API routes below (exclude public pages and static assets)
+app.use((req, res, next) => {
+  if (
+    req.path === '/login' ||
+    req.path.startsWith('/icons') ||
+    req.path.endsWith('.css') ||
+    req.path.endsWith('.png') ||
+    req.path.endsWith('.ico') ||
+    req.path.startsWith('/api/auth/login')
+  ) {
+    return next();
+  }
+  if (req.path === '/change-password.html') {
+    if (req.session.user && req.session.mustChangePassword) {
+      return next();
+    }
+    return res.redirect('/login');
+  }
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+  next();
+});
 
 // List WireGuard files
 app.get('/api/wireguard-files', async (req, res) => {
@@ -260,7 +347,12 @@ app.route('/api/operation-history')
     }
   });
 
-// Route to serve the explicit home page
+// Public login page
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Authenticated home page
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'gluetun-switcher.html'));
 });

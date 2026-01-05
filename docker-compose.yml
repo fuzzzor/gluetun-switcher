@@ -12,12 +12,15 @@ services:
       # Accédez à l'application via http://localhost:3003
       - "3003:3003"
     environment:
-      # Chemin où se trouvent les fichiers .conf à l'intérieur du conteneur
       - WIREGUARD_DIR=/etc/wireguard
-      # Nom(s) du ou des conteneur(s) à redémarrer, séparés par une virgule
       - CONTAINER_TO_RESTART=gluetun,qbittorrent
       - NODE_ENV=production
+      - SESSION_SECRET=CHANGE_ME_RANDOM_64_CHARS
+      - HTTPS_ENABLED=false
+      - PASSWORD_MIN_LENGTH=12
+      - PASSWORD_MAX_ATTEMPTS=5
     volumes:
+      - ./certs:/certs:ro
       # Persistance des données de l'application
       - /volume1/docker/gluetun-switcher/config:/usr/src/app/config
       # --- VOLUME A ADAPTER PAR L'UTILISATEUR ---

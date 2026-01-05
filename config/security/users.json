@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "username": "admin",
+      "passwordHash": "$argon2id$v=19$m=65536,t=3,p=4$X35Q5V0FzUPlRyudoLg0qg$yDyfd7VmKUeJkcc7PxIZ0VWnWtCgoePIUhA7BVKkoww",
+      "mustChangePassword": false,
+      "failedAttempts": 0,
+      "lockedUntil": null
+    },
+    {
+      "username": "fusor",
+      "passwordHash": "$argon2id$v=19$m=65536,t=3,p=4$aTlmeJ2GMbPr0SqKHf2Okw$wsjylHp7Vwo4d4AfUbqpdOfbWUeHaJ6z/mB2KtJDa1s",
+      "mustChangePassword": false,
+      "failedAttempts": 0,
+      "lockedUntil": null
+    }
+  ]
+}
