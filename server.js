@@ -22,6 +22,8 @@ async function startServer() {
 app.use(cors());
 app.use(express.json());
 
+const isHttps = security.httpsEnabled === true || process.env.NODE_ENV === 'production';
+
 app.use(session({
   name: security.sessionName,
   secret: security.sessionSecret,
@@ -29,8 +31,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: 'strict',
-    secure: security.httpsEnabled
+    sameSite: isHttps ? 'strict' : 'lax',
+    secure: isHttps
   }
 }));
 
