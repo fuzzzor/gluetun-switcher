@@ -6,6 +6,13 @@ Gluetun switcher is a lightweight web interface designed to simplify the managem
 
 ## Features
 
+- **Secure authentication (v2)**
+- **Argon2id password hashing**
+- **Mandatory password change on first login**
+- **Environment-driven password policy**
+- **Temporary account lock after failed attempts**
+- **Optional HTTPS support**
+
 - **Simple Web Interface:** A clean interface to view and manage your configuration files.
 - **One-Click Activation:** Select a `.conf` file and activate it. The application automatically copies it as `wg0.conf`.
 - **Automatic Restart:** Restarts one or more specified Docker containers after activating a new configuration.
@@ -45,6 +52,7 @@ services:
     ports:
       - "3003:3003"
     environment:
+      - SESSION_SECRET=CHANGE_ME_RANDOM_64_CHARS
       - WIREGUARD_DIR=/etc/wireguard
       - NODE_ENV=production
       - CONTAINER_TO_RESTART=gluetun,qBittorrent
@@ -90,6 +98,49 @@ Select your own volume !
 ---
 
 ## Configuration
+
+### Security & Authentication (v2)
+
+The following environment variables are required to enable the new authentication, password policy, and HTTPS features.
+
+#### Session & Authentication
+
+| Variable | Required | Description |
+|---------|----------|-------------|
+| `SESSION_SECRET` | **Yes** | Secret used to sign session cookies. Must be long, random and unique per deployment. |
+| `SESSION_NAME` | No | Session cookie name (default: `gluetun-switcher.sid`). |
+
+#### Admin Bootstrap
+
+| Variable | Required | Description |
+|---------|----------|-------------|
+| `ADMIN_USERNAME` | No | Initial administrator username (default: `admin`). |
+| `ADMIN_DEFAULT_PASSWORD` | No | Initial admin password, **forced to be changed on first login** (default: `switcher`). |
+
+#### Password Policy
+
+| Variable | Required | Description |
+|---------|----------|-------------|
+| `PASSWORD_MIN_LENGTH` | No | Minimum password length (default: 12). |
+| `PASSWORD_REQUIRE_UPPERCASE` | No | Require at least one uppercase letter. |
+| `PASSWORD_REQUIRE_LOWERCASE` | No | Require at least one lowercase letter. |
+| `PASSWORD_REQUIRE_DIGIT` | No | Require at least one numeric digit. |
+| `PASSWORD_REQUIRE_SPECIAL` | No | Require at least one special character. |
+| `PASSWORD_MAX_ATTEMPTS` | No | Number of failed attempts before account lock. |
+| `PASSWORD_LOCK_TIME` | No | Account lock duration in seconds (default: 900). |
+
+#### HTTPS (Optional)
+
+| Variable | Required | Description |
+|---------|----------|-------------|
+| `HTTPS_ENABLED` | No | Enable HTTPS server (`true` or `false`). |
+| `HTTPS_KEY_PATH` | If HTTPS | Path to TLS private key inside container. |
+| `HTTPS_CERT_PATH` | If HTTPS | Path to TLS certificate inside container. |
+
+> When HTTPS is enabled, you must mount a volume containing your certificates (e.g. `/certs`).
+
+
+**On first access, the admin user is forced to change the default password.**
 
 ### Environment Variables
 

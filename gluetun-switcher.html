@@ -126,9 +126,15 @@
 </head>
 <body>
     <div class="container">
-        <header class="header">
-            <h1><i class="fas fa-shield-alt"></i> <span data-i18n="title">Gluetun Switcher</span></h1>
-            <p data-i18n="subtitle">Select and activate your WireGuard configurations</p>
+        <header class="header" style="position:relative; text-align:center;">
+            <div>
+                <h1><i class="fas fa-shield-alt"></i> <span data-i18n="title">Gluetun Switcher</span></h1>
+                <p data-i18n="subtitle">Select and activate your WireGuard configurations</p>
+            </div>
+            <div id="userInfo" style="position:absolute; right:0; top:50%; transform:translateY(-50%); text-align:right; font-size:0.9rem;">
+                <div id="loggedUser" style="font-weight:600;"></div>
+                <a href="#" id="logoutLink" style="color:#dc2626;text-decoration:none;">Logout</a>
+            </div>
         </header>
 
         <main class="main-content">
@@ -231,5 +237,53 @@
     </div>
 
     <script src="wireguard-script.js"></script>
+    <script>
+      // Fix collapse toggle: only the chevron button controls the collapse
+      document.querySelectorAll('.card-header[data-collapsible]').forEach(header => {
+        const targetId = header.dataset.collapsible;
+        const content = document.getElementById(targetId);
+        const toggle = header.querySelector('.collapse-toggle');
+        const icon = toggle.querySelector('i');
+
+        // Ensure initial state: collapsed
+        content.classList.add('hidden');
+        toggle.setAttribute('aria-expanded', 'false');
+        icon.className = 'fas fa-chevron-up';
+
+        toggle.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const expanded = toggle.getAttribute('aria-expanded') === 'true';
+
+          if (expanded) {
+            content.classList.add('hidden');
+            icon.className = 'fas fa-chevron-up';
+            toggle.setAttribute('aria-expanded', 'false');
+          } else {
+            content.classList.remove('hidden');
+            icon.className = 'fas fa-chevron-down';
+            toggle.setAttribute('aria-expanded', 'true');
+          }
+        });
+      });
+    </script>
+    <script>
+      // Load logged user info
+      fetch('/api/auth/me')
+        .then(r => r.json())
+        .then(d => {
+          if (d.success) {
+            document.getElementById('loggedUser').textContent = d.username;
+          }
+        });
+
+      // Logout handler
+      document.getElementById('logoutLink').addEventListener('click', (e) => {
+        e.preventDefault();
+        fetch('/api/auth/logout', { method: 'POST' })
+          .then(() => window.location.href = '/login');
+      });
+    </script>
 </body>
 </html>
