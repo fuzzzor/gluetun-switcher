@@ -87,22 +87,25 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/change-password', async (req, res) => {
-  // DEBUG: log session and password policy evaluation
-  console.log('[CHANGE-PASSWORD] session.user =', req.session && req.session.user);
-  console.log('[CHANGE-PASSWORD] session.mustChangePassword =', req.session && req.session.mustChangePassword);
-  console.log('[CHANGE-PASSWORD] newPassword length =', req.body && req.body.newPassword && req.body.newPassword.length);
+  // FINAL FIX: never block password change when user is authenticated
+  console.log('[CHANGE-PASSWORD FINAL] session =', req.session);
 
-  if (!req.session.user) {
-    return res.status(403).json({ success: false, error: 'not_allowed' });
+  if (!req.session || !req.session.user) {
+    console.error('[CHANGE-PASSWORD FINAL] no session user');
+    return res.status(401).json({ success: false, error: 'not_authenticated' });
   }
+
   try {
     await authService.changePassword(req.session.user.username, req.body.newPassword);
+
+    // Clear flags and persist session
     req.session.mustChangePassword = false;
     req.session.save(() => {
+      console.log('[CHANGE-PASSWORD FINAL] success');
       res.json({ success: true });
     });
   } catch (e) {
-    console.error('[CHANGE-PASSWORD] error =', e.message);
+    console.error('[CHANGE-PASSWORD FINAL] policy error =', e.message);
     res.status(400).json({ success: false, error: e.message });
   }
 });
