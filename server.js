@@ -65,9 +65,18 @@ app.post('/api/auth/login', async (req, res) => {
     if (!result.success) {
       return res.status(401).json({ success: false, locked: result.locked || false });
     }
+
     req.session.user = { username };
     req.session.mustChangePassword = !!result.mustChangePassword;
-    res.json({ success: true, mustChangePassword: result.mustChangePassword, noPassword: !!result.noPassword });
+
+    // Ensure the session is persisted before responding (important in Docker / async IO)
+    req.session.save(() => {
+      res.json({
+        success: true,
+        mustChangePassword: result.mustChangePassword,
+        noPassword: !!result.noPassword
+      });
+    });
   } catch (e) {
     res.status(500).json({ success: false });
   }
