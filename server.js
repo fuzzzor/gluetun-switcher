@@ -19,7 +19,11 @@ async function startServer() {
   const statePath = path.join(__dirname, 'config', 'state.json');
 
 // Middlewares
-app.use(cors());
+// CORS configuration: allow credentials so session cookies are accepted
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 app.use(express.json());
 
 const isHttps = security.httpsEnabled === true || process.env.NODE_ENV === 'production';
