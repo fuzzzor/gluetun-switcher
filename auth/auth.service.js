@@ -1,7 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const argon2 = require('argon2');
-const security = require('../config/security.config');
+const security = require('../config/security.config.js');
 
 const USERS_PATH = path.join(__dirname, '..', 'config', 'security', 'users.json');
 
