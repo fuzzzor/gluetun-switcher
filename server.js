@@ -25,6 +25,8 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+// Parse application/x-www-form-urlencoded (HTML form posts)
+app.use(express.urlencoded({ extended: false }));
 
 const isHttps = security.httpsEnabled === true || process.env.NODE_ENV === 'production';
 
