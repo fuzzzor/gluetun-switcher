@@ -87,13 +87,16 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/change-password', async (req, res) => {
-  if (!req.session.user || !req.session.mustChangePassword) {
+  // Only require an authenticated user; the mustChangePassword flag is advisory
+  if (!req.session.user) {
     return res.status(403).json({ success: false, error: 'not_allowed' });
   }
   try {
     await authService.changePassword(req.session.user.username, req.body.newPassword);
     req.session.mustChangePassword = false;
-    res.json({ success: true });
+    req.session.save(() => {
+      res.json({ success: true });
+    });
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
   }
