@@ -35,8 +35,10 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    // REQUIRED for fetch() + redirect flows
-    sameSite: 'none',
+    // IMPORTANT:
+    // - SameSite=None REQUIRES Secure=true (HTTPS), otherwise browsers drop the cookie
+    // - In HTTP (local/Docker), use Lax so cookies are sent
+    sameSite: isHttps ? 'none' : 'lax',
     secure: isHttps
   }
 }));
