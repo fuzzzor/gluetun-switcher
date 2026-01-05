@@ -103,10 +103,12 @@ app.post('/api/auth/change-password', async (req, res) => {
     if (req.session) {
       req.session.mustChangePassword = false;
       req.session.save(() => {
-        res.json({ success: true });
+        // After HTML form POST, redirect to home page
+        res.redirect('/');
       });
     } else {
-      res.json({ success: true });
+      // Fallback redirect
+      res.redirect('/');
     }
   } catch (e) {
     res.status(400).json({ success: false, error: e.message });
