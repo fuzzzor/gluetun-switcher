@@ -16,11 +16,29 @@ async function saveUsers(data) {
 
 function validatePasswordPolicy(password) {
   const policy = security.passwordPolicy;
-  if (password.length < policy.minLength) return false;
-  if (policy.requireUppercase && !/[A-Z]/.test(password)) return false;
-  if (policy.requireLowercase && !/[a-z]/.test(password)) return false;
-  if (policy.requireDigit && !/[0-9]/.test(password)) return false;
-  if (policy.requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) return false;
+
+  if (password.length < policy.minLength) {
+    console.error('[PASSWORD POLICY] fail: minLength', password.length, '<', policy.minLength);
+    return false;
+  }
+  if (policy.requireUppercase && !/[A-Z]/.test(password)) {
+    console.error('[PASSWORD POLICY] fail: requireUppercase');
+    return false;
+  }
+  if (policy.requireLowercase && !/[a-z]/.test(password)) {
+    console.error('[PASSWORD POLICY] fail: requireLowercase');
+    return false;
+  }
+  if (policy.requireDigit && !/[0-9]/.test(password)) {
+    console.error('[PASSWORD POLICY] fail: requireDigit');
+    return false;
+  }
+  if (policy.requireSpecial && !/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    console.error('[PASSWORD POLICY] fail: requireSpecial');
+    return false;
+  }
+
+  console.log('[PASSWORD POLICY] OK');
   return true;
 }
 

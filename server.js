@@ -87,7 +87,11 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/change-password', async (req, res) => {
-  // Only require an authenticated user; the mustChangePassword flag is advisory
+  // DEBUG: log session and password policy evaluation
+  console.log('[CHANGE-PASSWORD] session.user =', req.session && req.session.user);
+  console.log('[CHANGE-PASSWORD] session.mustChangePassword =', req.session && req.session.mustChangePassword);
+  console.log('[CHANGE-PASSWORD] newPassword length =', req.body && req.body.newPassword && req.body.newPassword.length);
+
   if (!req.session.user) {
     return res.status(403).json({ success: false, error: 'not_allowed' });
   }
@@ -98,6 +102,7 @@ app.post('/api/auth/change-password', async (req, res) => {
       res.json({ success: true });
     });
   } catch (e) {
+    console.error('[CHANGE-PASSWORD] error =', e.message);
     res.status(400).json({ success: false, error: e.message });
   }
 });
@@ -179,9 +184,19 @@ app.get('/api/locations', async (req, res) => {
     }
 
     // 2. Load locations data (respecting development environment)
-    const locationsFile = process.env.NODE_ENV === 'development'
-      ? path.join(__dirname, 'locations.local.json')
-      : path.join(__dirname, 'config', 'locations.json');
+    const devLocations = path.join(__dirname, 'locations.local.json');
+    const prodLocations = path.join(__dirname, 'config', 'locations.json');
+
+    let locationsFile = prodLocations;
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        await fs.access(devLocations);
+        locationsFile = devLocations;
+      } catch {
+        locationsFile = prodLocations;
+      }
+    }
+
     const locationsData = JSON.parse(await fs.readFile(locationsFile, 'utf8'));
 
     // 3. Process and enrich locations
