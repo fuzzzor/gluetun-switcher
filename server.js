@@ -114,28 +114,21 @@ app.use(express.static(__dirname));
 app.use((req, res, next) => {
   console.log('[AUTH MIDDLEWARE]', req.method, req.path, 'session user =', req.session && req.session.user);
 
-  // Public API endpoints
-  if (req.path.startsWith('/api/auth/login')) {
-    return next();
-  }
+  // Public auth APIs
+  if (req.path.startsWith('/api/auth/login')) return next();
+  if (req.path.startsWith('/api/auth/change-password')) return next();
 
-  // Allow login page
-  if (req.path === '/login') {
-    return next();
-  }
+  // Public pages
+  if (req.path === '/login') return next();
 
-  // Force password change flow
+  // Force password change flow (HTML only)
   if (req.path === '/change-password.html') {
-    if (req.session.user && req.session.mustChangePassword) {
-      return next();
-    }
+    if (req.session.user && req.session.mustChangePassword) return next();
     return res.redirect('/login');
   }
 
   // Protect everything else
-  if (!req.session.user) {
-    return res.redirect('/login');
-  }
+  if (!req.session.user) return res.redirect('/login');
 
   next();
 });
