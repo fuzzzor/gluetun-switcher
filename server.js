@@ -101,13 +101,17 @@ app.post('/api/auth/change-password', async (req, res) => {
     await authService.changePassword(username, req.body.newPassword);
 
     if (req.session) {
+      // Ensure the user is authenticated in session before redirecting
+      if (!req.session.user) {
+        req.session.user = { username };
+      }
       req.session.mustChangePassword = false;
       req.session.save(() => {
         // After HTML form POST, redirect to home page
         res.redirect('/');
       });
     } else {
-      // Fallback redirect
+      // Fallback redirect (should not happen with sessions enabled)
       res.redirect('/');
     }
   } catch (e) {
