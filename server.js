@@ -35,7 +35,8 @@ app.use(session({
   saveUninitialized: false,
   cookie: {
     httpOnly: true,
-    sameSite: isHttps ? 'strict' : 'lax',
+    // REQUIRED for fetch() + redirect flows
+    sameSite: 'none',
     secure: isHttps
   }
 }));
