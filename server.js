@@ -6,7 +6,7 @@ const fs = require('fs').promises;
 const Docker = require('dockerode');
 const session = require('express-session');
 const authService = require('./auth/auth.service');
-const security = require('./config/security.config');
+const security = require('./config/security.config.js');
 const http = require('http');
 const https = require('https');
 
