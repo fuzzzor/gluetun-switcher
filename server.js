@@ -99,27 +99,36 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
-// Protect API routes below (exclude public pages and static assets)
+// Serve static files FIRST (HTML, CSS, JS, images)
+app.use(express.static(__dirname));
+
+// Protect API routes and pages below
 app.use((req, res, next) => {
-  if (
-    req.path === '/login' ||
-    req.path.startsWith('/icons') ||
-    req.path.endsWith('.css') ||
-    req.path.endsWith('.png') ||
-    req.path.endsWith('.ico') ||
-    req.path.startsWith('/api/auth/login')
-  ) {
+  console.log('[AUTH MIDDLEWARE]', req.method, req.path, 'session user =', req.session && req.session.user);
+
+  // Public API endpoints
+  if (req.path.startsWith('/api/auth/login')) {
     return next();
   }
+
+  // Allow login page
+  if (req.path === '/login') {
+    return next();
+  }
+
+  // Force password change flow
   if (req.path === '/change-password.html') {
     if (req.session.user && req.session.mustChangePassword) {
       return next();
     }
     return res.redirect('/login');
   }
+
+  // Protect everything else
   if (!req.session.user) {
     return res.redirect('/login');
   }
+
   next();
 });
 
