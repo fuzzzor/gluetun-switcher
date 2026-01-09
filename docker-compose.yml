@@ -17,7 +17,7 @@ services:
       - NODE_ENV=production
       - SESSION_SECRET=CHANGE_ME_RANDOM_64_CHARS
       - HTTPS_ENABLED=false
-      - PASSWORD_MIN_LENGTH=12
+      - PASSWORD_MIN_LENGTH=8
       - PASSWORD_MAX_ATTEMPTS=5
     volumes:
       - ./certs:/certs:ro

@@ -122,6 +122,131 @@
         .current-config i {
             font-size: 1.5rem;
         }
+
+        /* User Menu & Dropdown */
+        .user-menu-container {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+
+        .user-avatar-btn {
+            background: #374151;
+            border: none;
+            border-radius: 20px;
+            padding: 4px 10px 4px 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            color: #e5e7eb;
+        }
+
+        .user-avatar-btn:hover {
+            background: #4b5563;
+        }
+
+        .avatar-circle {
+            width: 32px;
+            height: 32px;
+            background: #10b981;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            font-size: 1.1rem;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: #1f2937;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            width: 260px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            padding: 8px 0;
+            display: none;
+            text-align: left;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .menu-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #374151;
+            margin-bottom: 8px;
+            color: #9ca3af;
+            font-size: 0.85rem;
+        }
+
+        .menu-header strong {
+            display: block;
+            color: #e5e7eb;
+            font-size: 1rem;
+            margin-top: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .menu-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            color: #d1d5db;
+            text-decoration: none;
+            transition: background 0.2s;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-size: 0.95rem;
+            cursor: pointer;
+            box-sizing: border-box;
+        }
+
+        .menu-item:hover {
+            background: #374151;
+        }
+
+        .menu-item i {
+            width: 20px;
+            text-align: center;
+            color: #9ca3af;
+        }
+
+        .menu-item:hover i {
+            color: #e5e7eb;
+        }
+
+        .menu-item.danger {
+            color: #ef4444;
+        }
+        
+        .menu-item.danger:hover {
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .menu-item.danger i {
+            color: #ef4444;
+        }
+
+        .menu-divider {
+            height: 1px;
+            background: #374151;
+            margin: 8px 0;
+        }
     </style>
 </head>
 <body>
@@ -131,9 +256,35 @@
                 <h1><i class="fas fa-shield-alt"></i> <span data-i18n="title">Gluetun Switcher</span></h1>
                 <p data-i18n="subtitle">Select and activate your WireGuard configurations</p>
             </div>
-            <div id="userInfo" style="position:absolute; right:0; top:50%; transform:translateY(-50%); text-align:right; font-size:0.9rem;">
-                <div id="loggedUser" style="font-weight:600;"></div>
-                <a href="#" id="logoutLink" style="color:#dc2626;text-decoration:none;">Logout</a>
+            <div class="user-menu-container">
+                <button id="userMenuBtn" class="user-avatar-btn" aria-expanded="false">
+                    <div id="userAvatar" class="avatar-circle"></div>
+                    <i class="fas fa-chevron-down" style="font-size: 0.8em;"></i>
+                </button>
+                
+                <div id="userDropdown" class="dropdown-menu">
+                    <div class="menu-header">
+                        <span data-i18n="loggedInAs">Connecté en tant que</span>
+                        <strong id="menuUsername">...</strong>
+                    </div>
+                    
+                    <a href="/change-password.html" class="menu-item">
+                        <i class="fas fa-key"></i>
+                        <span data-i18n="changePassword">Changer de mot de passe</span>
+                    </a>
+                    
+                    <a href="#" class="menu-item" style="opacity: 0.5; cursor: not-allowed;" title="Bientôt disponible">
+                        <i class="fas fa-cog"></i>
+                        <span data-i18n="settings">Paramètres</span>
+                    </a>
+                    
+                    <div class="menu-divider"></div>
+                    
+                    <button id="logoutBtn" class="menu-item danger">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span data-i18n="logout">Déconnexion</span>
+                    </button>
+                </div>
             </div>
         </header>
 
@@ -269,17 +420,39 @@
       });
     </script>
     <script>
+      // User Menu Logic
+      const userMenuBtn = document.getElementById('userMenuBtn');
+      const userDropdown = document.getElementById('userDropdown');
+      
+      // Toggle dropdown
+      userMenuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isExpanded = userMenuBtn.getAttribute('aria-expanded') === 'true';
+        userMenuBtn.setAttribute('aria-expanded', !isExpanded);
+        userDropdown.classList.toggle('show');
+      });
+      
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+          userDropdown.classList.remove('show');
+          userMenuBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+
       // Load logged user info
       fetch('/api/auth/me')
         .then(r => r.json())
         .then(d => {
           if (d.success) {
-            document.getElementById('loggedUser').textContent = d.username;
+            const username = d.username || 'User';
+            document.getElementById('menuUsername').textContent = username;
+            document.getElementById('userAvatar').textContent = username.charAt(0).toUpperCase();
           }
         });
 
       // Logout handler
-      document.getElementById('logoutLink').addEventListener('click', (e) => {
+      document.getElementById('logoutBtn').addEventListener('click', (e) => {
         e.preventDefault();
         fetch('/api/auth/logout', { method: 'POST' })
           .then(() => window.location.href = '/login');

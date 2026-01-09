@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Gluetun-Switcher – Login</title>
+  <title data-i18n="loginTitle">Gluetun-Switcher – Login</title>
   <style>
     body { font-family: Arial, sans-serif; background:#705EBD; color:#e5e7eb; display:flex; align-items:center; justify-content:center; height:100vh; }
     .login { background:#2563eb; padding:2rem; border-radius:8px; width:320px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
@@ -18,18 +18,39 @@
   <form class="login" onsubmit="login(); return false;">
     <img src="/icons/logoswitcher.png" alt="Gluetun-Switcher" style="display:block;margin:0 auto 1rem auto;max-width:120px;" />
     <h1>Gluetun-Switcher</h1>
-    <label>Username
+    <label>
+      <span data-i18n="username">Username</span>
       <input id="username" autocomplete="username" />
     </label>
-    <label>Password
+    <label>
+      <span data-i18n="password">Password</span>
       <input id="password" type="password" autocomplete="current-password" />
     </label>
-    <button type="submit">Sign in</button>
+    <button type="submit" data-i18n="signIn">Sign in</button>
     <div id="error" class="error"></div>
-    <div class="footer">2025-2026 - Gluetun-switcher</div>    
+    <div class="footer" style="position:relative;">
+        2025-2026 - Gluetun-switcher
+        <span id="appVersion" style="position:absolute; right:0; bottom:0; opacity:0.5; font-size:0.8em;"></span>
+    </div>    
   </form>
 
 <script>
+let translations = {};
+
+async function loadTranslations() {
+  const lang = navigator.language.startsWith('fr') ? 'fr' : 'en';
+  try {
+    const res = await fetch(`/locales/${lang}.json`);
+    translations = await res.json();
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (translations[key]) el.textContent = translations[key];
+    });
+  } catch (e) {
+    console.error('Translation load failed', e);
+  }
+}
+
 async function login() {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
@@ -43,7 +64,10 @@ async function login() {
 
   const data = await res.json();
   if (!data.success) {
-    document.getElementById('error').textContent = data.locked ? 'Account locked' : 'Invalid credentials or user unknown';
+    const errorMsg = data.locked ? 
+      (translations['accountLocked'] || 'Account locked') : 
+      (translations['loginError'] || 'Invalid credentials or user unknown');
+    document.getElementById('error').textContent = errorMsg;
     return;
   }
 
@@ -53,6 +77,16 @@ async function login() {
     window.location.href = '/';
   }
 }
+
+// Load version
+fetch('/api/version')
+  .then(r => r.json())
+  .then(d => {
+    if (d.version) document.getElementById('appVersion').textContent = 'v' + d.version;
+  })
+  .catch(e => console.error('Failed to load version', e));
+
+loadTranslations();
 </script>
 </body>
 </html>

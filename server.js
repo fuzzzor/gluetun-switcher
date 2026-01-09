@@ -1,4 +1,5 @@
 require('dotenv').config();
+const packageJson = require('./package.json');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -28,7 +29,7 @@ app.use(express.json());
 // Parse application/x-www-form-urlencoded (HTML form posts)
 app.use(express.urlencoded({ extended: false }));
 
-const isHttps = security.httpsEnabled === true || process.env.NODE_ENV === 'production';
+const isHttps = security.httpsEnabled === true;
 
 app.use(session({
   name: security.sessionName,
@@ -92,11 +93,11 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 app.post('/api/auth/change-password', async (req, res) => {
-  // HARD STOP FIX: allow password change without session (bootstrap case)
-  // This endpoint is only reachable from the change-password page
   try {
-    const username = (req.session && req.session.user && req.session.user.username)
-      || security.admin.username;
+    if (!req.session || !req.session.user) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const username = req.session.user.username;
 
     await authService.changePassword(username, req.body.newPassword);
 
@@ -119,6 +120,24 @@ app.post('/api/auth/change-password', async (req, res) => {
   }
 });
 
+app.get('/api/auth/policy', (req, res) => {
+  res.json(security.passwordPolicy);
+});
+
+app.get('/api/version', (req, res) => {
+  res.json({ version: packageJson.version });
+});
+
+// Protect sensitive HTML files from direct static access
+app.use((req, res, next) => {
+  if (req.path === '/change-password.html' || req.path === '/gluetun-switcher.html') {
+    if (!req.session || !req.session.user) {
+      return res.redirect('/login');
+    }
+  }
+  next();
+});
+
 // Serve static files FIRST (HTML, CSS, JS, images)
 app.use(express.static(__dirname));
 
@@ -129,6 +148,8 @@ app.use((req, res, next) => {
   // Public auth APIs
   if (req.path.startsWith('/api/auth/login')) return next();
   if (req.path.startsWith('/api/auth/change-password')) return next();
+  if (req.path.startsWith('/api/auth/policy')) return next();
+  if (req.path === '/api/version') return next();
 
   // Public pages
   if (req.path === '/login') return next();

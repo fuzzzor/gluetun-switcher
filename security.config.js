@@ -2,7 +2,7 @@
 // All defaults are secure-by-default and documented in README.md
 
 module.exports = {
-  httpsEnabled: process.env.HTTPS_ENABLED === 'false',
+  httpsEnabled: process.env.HTTPS_ENABLED === 'true',
   httpsKeyPath: process.env.HTTPS_KEY_PATH || '',
   httpsCertPath: process.env.HTTPS_CERT_PATH || '',
 
