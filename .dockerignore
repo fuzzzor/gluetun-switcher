@@ -6,6 +6,7 @@ node_modules
 # Log files
 npm-debug.log
 *.log
+*.docx
 
 # Docker configuration and documentation files
 Dockerfile

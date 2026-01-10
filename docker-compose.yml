@@ -20,8 +20,8 @@ services:
       - PASSWORD_MIN_LENGTH=8
       - PASSWORD_MAX_ATTEMPTS=5
       # Configuration de la carte et géolocalisation
-      - GEOLOCATION_API_URL=http://192.168.0.242:8000/v1/publicip/ip
-      - MAP_TILE_URL=https://api.maptiler.com/maps/streets/style.json?key=7EhtBt6sltDR0uZ1eMri
+      - GEOLOCATION_API_URL=http://{ADD_YOUR_IP}:8000/v1/publicip/ip
+      - MAP_TILE_URL=https://api.maptiler.com/maps/streets/style.json?key={ADD_YOUR_API_KEY}
     volumes:
       - ./certs:/certs:ro
       # Persistance des données de l'application

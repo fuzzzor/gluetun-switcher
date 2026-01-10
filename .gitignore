@@ -1,5 +1,6 @@
 # Ignore the local WireGuard configuration folder
 wireguard-configs-local/
+*.docx
 # Local environment file
 .env
 # Local configuration files and folders
