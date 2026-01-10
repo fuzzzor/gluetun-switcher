@@ -128,6 +128,39 @@ app.get('/api/version', (req, res) => {
   res.json({ version: packageJson.version });
 });
 
+// Get map and geolocation configuration
+app.get('/api/config/map', (req, res) => {
+  res.json({
+    success: true,
+    config: {
+      geolocationApiUrl: '/api/geolocation', // Use internal proxy endpoint
+      mapTileUrl: process.env.MAP_TILE_URL || 'https://api.maptiler.com/maps/streets/style.json?key=demo_key'
+    }
+  });
+});
+
+// Proxy endpoint for geolocation to avoid CORS issues
+app.get('/api/geolocation', async (req, res) => {
+  try {
+    const geolocationUrl = process.env.GEOLOCATION_API_URL || 'http://localhost:8000/v1/publicip/ip';
+    const response = await fetch(geolocationUrl);
+    
+    if (!response.ok) {
+      throw new Error(`API responded with status ${response.status}`);
+    }
+    
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Geolocation proxy error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch geolocation data',
+      details: error.message
+    });
+  }
+});
+
 // Protect sensitive HTML files from direct static access
 app.use((req, res, next) => {
   if (req.path === '/change-password.html' || req.path === '/gluetun-switcher.html') {

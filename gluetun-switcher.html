@@ -6,6 +6,7 @@
     <title data-i18n="title">Gluetun Switcher</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.css" rel="stylesheet">
     <style>
         .file-list {
             max-height: 400px;
@@ -115,12 +116,29 @@
             border-radius: var(--border-radius);
             margin-bottom: 20px;
             display: flex;
-            align-items: center;
-            gap: 15px;
+            align-items: stretch;
+            gap: 20px;
         }
         
-        .current-config i {
+        .current-config-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex: 1;
+        }
+        
+        .current-config-content i {
             font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        
+        .current-config-text {
+            flex: 1;
+        }
+        
+        .current-config-map {
+            flex: 0 0 275px;
+            height: 275px;
         }
 
         /* User Menu & Dropdown */
@@ -246,6 +264,24 @@
             height: 1px;
             background: #374151;
             margin: 8px 0;
+        }
+        /* Map container for current city */
+        #currentMap {
+            height: 100%;
+            width: 100%;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+        }
+        
+        .map-error {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            font-size: 0.9rem;
+            text-align: center;
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -387,6 +423,7 @@
         </div>
     </div>
 
+    <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
     <script src="wireguard-script.js"></script>
     <script>
       // Fix collapse toggle: only the chevron button controls the collapse

@@ -38,6 +38,7 @@ const api = {
     getCurrentConfigInfo: () => api.get('current-config-info'),
     activateConfig: (sourcePath) => api.post('activate-config', { sourcePath }),
     getLocations: () => api.get('locations'),
+    getMapConfig: () => api.get('config/map'),
 };
 
 
@@ -47,6 +48,7 @@ let wireguardFiles = [];
 let operationHistory = [];
 let translations = {};
 let locationData = {};
+let mapConfig = {};
 
 // DOM Elements
 const refreshBtn = document.getElementById('refreshBtn');
@@ -94,7 +96,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Load critical data first. If this fails, the app can't start.
         await Promise.all([
             loadTranslations(),
-            loadLocations()
+            loadLocations(),
+            loadMapConfig()
         ]);
 
         // Initialize the rest of the app
@@ -138,6 +141,21 @@ async function loadLocations() {
         console.error('Could not load locations:', error);
         // Re-throw to be caught by the main initializer
         throw new Error(`Failed to load location data: ${error.message}`);
+    }
+}
+
+async function loadMapConfig() {
+    try {
+        const result = await api.getMapConfig();
+        if (result.success) {
+            mapConfig = result.config;
+        } else {
+            throw new Error(result.error);
+        }
+    } catch (error) {
+        console.error('Could not load map configuration:', error);
+        // Re-throw to be caught by the main initializer
+        throw new Error(`Failed to load map configuration: ${error.message}`);
     }
 }
  
@@ -310,13 +328,20 @@ async function checkCurrentConfig() {
             const location = getLocationInfo(configInfo.name);
             const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
             currentConfig.innerHTML = `
-                <i class="fas fa-check-circle"></i>
-                <div>
-                    <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
-                    <p>${locationString} - ${translations.size.replace('{size}', formatFileSize(configInfo.size))}</p>
+                <div class="current-config-content">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="current-config-text">
+                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                        <p>${locationString} - ${translations.size.replace('{size}', formatFileSize(configInfo.size))}</p>
+                    </div>
+                </div>
+                <div class="current-config-map">
+                    <div id="currentMap"></div>
                 </div>
             `;
             currentConfig.style.background = '';
+            // Initialize the map for the current configuration (fetches location from local API)
+            initCurrentMap(location);
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>
@@ -340,6 +365,90 @@ async function checkCurrentConfig() {
         `;
         currentConfig.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
         console.error('Erreur dans checkCurrentConfig:', error);
+    }
+}
+
+// Initialize the MapLibre map in the #currentMap container using the configured APIs
+async function initCurrentMap(locationInfo) {
+    const mapContainer = document.getElementById('currentMap');
+    if (!mapContainer) return;
+
+    mapContainer.innerHTML = '';
+
+    try {
+        // Use configured geolocation API URL
+        const geolocationUrl = mapConfig.geolocationApiUrl;
+        if (!geolocationUrl) {
+            throw new Error('Geolocation API URL not configured');
+        }
+
+        const resp = await fetch(geolocationUrl);
+        if (!resp.ok) throw new Error('Erreur API position');
+        const data = await resp.json();
+
+        console.log('DEBUG: API response data:', data);
+
+        // Parse coordinates from location string format "47.498249,19.039780"
+        let lat = null, lon = null;
+        
+        if (data.location && typeof data.location === 'string') {
+            console.log('DEBUG: Found location string:', data.location);
+            const coords = data.location.split(',');
+            console.log('DEBUG: Split coords:', coords);
+            if (coords.length === 2) {
+                lat = parseFloat(coords[0]);
+                lon = parseFloat(coords[1]);
+                console.log('DEBUG: Parsed coordinates:', lat, lon);
+            }
+        }
+        
+        // Fallback to common property names if location string format not available
+        if (lat === null || lon === null) {
+            console.log('DEBUG: Using fallback coordinates from:', data);
+            lat = data.latitude ?? data.lat ?? null;
+            lon = data.longitude ?? data.lon ?? data.lng ?? null;
+            console.log('DEBUG: Fallback coordinates:', lat, lon);
+        }
+
+        if (lat == null || lon == null) {
+            console.log('DEBUG: No valid coordinates found');
+            mapContainer.innerHTML = `<div class="map-error">${translations.locationNotFound || 'Location coordinates not available'}</div>`;
+            return;
+        }
+
+        console.log('DEBUG: Final coordinates for map:', lat, lon);
+
+        if (!window.maplibregl) {
+            mapContainer.innerHTML = `<div class="map-error">${translations.mapLibraryMissing || 'Map library not loaded'}</div>`;
+            return;
+        }
+
+        // Use configured map tile URL
+        const mapTileUrl = mapConfig.mapTileUrl;
+        if (!mapTileUrl) {
+            throw new Error('Map tile URL not configured');
+        }
+
+        // Create map
+        const map = new maplibregl.Map({
+            container: mapContainer,
+            style: mapTileUrl,
+            center: [Number(lon), Number(lat)],
+            zoom: 10
+        });
+
+        // Add a marker
+        new maplibregl.Marker().setLngLat([Number(lon), Number(lat)]).addTo(map);
+
+        // Optional popup with location name
+        if (locationInfo && (locationInfo.name || locationInfo.city)) {
+            const popup = new maplibregl.Popup({ offset: 25 }).setText(`${locationInfo.name}${locationInfo.city ? (', ' + locationInfo.city) : ''}`);
+            new maplibregl.Marker().setLngLat([Number(lon), Number(lat)]).setPopup(popup).addTo(map);
+        }
+
+    } catch (error) {
+        console.error('Erreur initialisation carte:', error);
+        mapContainer.innerHTML = `<div class="map-error">${translations.mapLoadError || 'Failed to load map'}</div>`;
     }
 }
 
