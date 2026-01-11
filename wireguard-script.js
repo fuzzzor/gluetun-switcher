@@ -50,6 +50,8 @@ let translations = {};
 let locationData = {};
 let mapConfig = {};
 let currentIpInfo = null; // Store current IP information
+let lastKnownIp = null; // Store last known IP to detect changes
+let isWaitingForIpChange = false; // Flag to indicate we're waiting for IP change
 
 // DOM Elements
 const refreshBtn = document.getElementById('refreshBtn');
@@ -320,35 +322,102 @@ function selectFile(fileName) {
     }
 }
 
-// Function to fetch IP information from the primary API with minimal fallbacks
-async function fetchIpInfo() {
-    console.log('DEBUG: Starting fetchIpInfo()');
+// Function to get current IP from any working API
+async function getCurrentIpOnly() {
+    // Try primary API first
+    try {
+        const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip', {
+            signal: AbortSignal.timeout(3000)
+        });
+        if (response.ok) {
+            const data = await response.json();
+            return data.ip || null;
+        }
+    } catch (error) {
+        // Silent fail, try next API
+    }
     
-    // Try the primary API first with a longer timeout to ensure it works
+    // Try geolocation API
+    try {
+        if (mapConfig && mapConfig.geolocationApiUrl) {
+            const response = await fetch(mapConfig.geolocationApiUrl, {
+                signal: AbortSignal.timeout(3000)
+            });
+            if (response.ok) {
+                const data = await response.json();
+                return data.public_ip || data.ip || null;
+            }
+        }
+    } catch (error) {
+        // Silent fail
+    }
+    
+    return null;
+}
+
+// Function to wait for IP change after VPN switch
+async function waitForIpChange(expectedOldIp, maxWaitTime = 30000) {
+    console.log(`DEBUG: Waiting for IP to change from ${expectedOldIp}...`);
+    
+    const startTime = Date.now();
+    const checkInterval = 2000; // Check every 2 seconds
+    
+    while (Date.now() - startTime < maxWaitTime) {
+        const currentIp = await getCurrentIpOnly();
+        console.log(`DEBUG: Current IP check: ${currentIp} (waiting for change from ${expectedOldIp})`);
+        
+        if (currentIp && currentIp !== expectedOldIp) {
+            console.log(`DEBUG: IP changed from ${expectedOldIp} to ${currentIp}!`);
+            return true;
+        }
+        
+        // Wait before next check
+        await new Promise(resolve => setTimeout(resolve, checkInterval));
+    }
+    
+    console.log(`DEBUG: Timeout waiting for IP change after ${maxWaitTime}ms`);
+    return false;
+}
+
+// Function to fetch IP information with smart waiting for VPN changes
+async function fetchIpInfo(waitForChange = false) {
+    console.log('DEBUG: Starting fetchIpInfo(), waitForChange:', waitForChange);
+    
+    // If we're waiting for a change, do the smart waiting first
+    if (waitForChange && lastKnownIp) {
+        console.log(`DEBUG: Waiting for IP to change from last known IP: ${lastKnownIp}`);
+        isWaitingForIpChange = true;
+        
+        // Wait for IP to change
+        const ipChanged = await waitForIpChange(lastKnownIp, 30000);
+        
+        if (!ipChanged) {
+            console.log('DEBUG: IP did not change within timeout, proceeding anyway');
+        }
+        
+        isWaitingForIpChange = false;
+    }
+    
+    // Try the primary API first
     try {
         console.log('DEBUG: Trying primary API: http://192.168.0.242:8000/v1/publicip/ip');
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
-        
         const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip', {
-            signal: controller.signal
+            signal: AbortSignal.timeout(8000)
         });
-        
-        clearTimeout(timeoutId);
         
         if (response.ok) {
             const data = await response.json();
             console.log('DEBUG: Primary API response:', data);
             
-            // Use the data exactly as returned by the primary API
-            if (data) {
+            if (data && data.ip) {
+                lastKnownIp = data.ip; // Store for future change detection
                 currentIpInfo = data;
                 console.log('DEBUG: Successfully got IP info from primary API:', data);
                 return data;
             }
         } else {
-            console.log('DEBUG: Primary API response not OK:', response.status, response.statusText);
+            console.log('DEBUG: Primary API response not OK:', response.status);
         }
     } catch (error) {
         console.error('DEBUG: Error with primary API:', error.message);
@@ -373,9 +442,14 @@ async function fetchIpInfo() {
                     }
                 }
                 
+                const ipFromGeoApi = data.public_ip || data.ip;
+                if (ipFromGeoApi) {
+                    lastKnownIp = ipFromGeoApi; // Store for future change detection
+                }
+                
                 // Use data from geolocation API properly
                 currentIpInfo = {
-                    ip: data.public_ip || data.ip || 'Non disponible',
+                    ip: ipFromGeoApi || 'Non disponible',
                     timezone: data.timezone || 'Non disponible',
                     location: data.location,
                     latitude: lat || data.latitude || data.lat,
@@ -437,7 +511,7 @@ async function checkCurrentConfig() {
             
             // Fetch IP info
             console.log('DEBUG: Fetching IP info...');
-            const ipInfo = await fetchIpInfo();
+            const ipInfo = await fetchIpInfo(false); // Normal fetch for config check
             console.log('DEBUG: IP info result:', ipInfo);
             
             // Build the display with IP and timezone info
@@ -664,7 +738,12 @@ async function executeActivation() {
             
             resetSelection();
             loadWireguardFiles();
-            checkCurrentConfig();
+            
+            // Wait for IP change before updating the current config display
+            showNotification('Attente du changement d\'IP...', 'info');
+            setTimeout(async () => {
+                await checkCurrentConfigWithIpWait();
+            }, 2000); // Wait 2 seconds for VPN to stabilize first
 
         } else {
             showNotification(result.error, 'error');
@@ -674,6 +753,99 @@ async function executeActivation() {
         const errorMessage = `${translations.unexpectedError}: ${error.message}`;
         showNotification(errorMessage, 'error');
         addToHistory({ type: 'error', message: errorMessage, timestamp: new Date() });
+    }
+}
+
+// Special version of checkCurrentConfig that waits for IP change
+async function checkCurrentConfigWithIpWait() {
+    console.log('DEBUG: Starting checkCurrentConfigWithIpWait()');
+    
+    try {
+        const configInfo = await api.getCurrentConfigInfo();
+        console.log('DEBUG: Config info:', configInfo);
+
+        if (configInfo.success) {
+            const location = getLocationInfo(configInfo.name);
+            console.log('DEBUG: Location info:', location);
+            const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
+            
+            // Show waiting state
+            currentConfig.innerHTML = `
+                <div class="current-config-content">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div class="current-config-text">
+                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                        <p>Attente du changement d'IP...</p>
+                    </div>
+                </div>
+                <div class="current-config-map">
+                    <div id="currentMap"></div>
+                </div>
+            `;
+            currentConfig.style.background = '';
+            
+            // Fetch IP info with smart waiting for change
+            console.log('DEBUG: Fetching IP info with change detection...');
+            const ipInfo = await fetchIpInfo(true); // Wait for IP change
+            console.log('DEBUG: IP info result after waiting:', ipInfo);
+            
+            // Build the display with IP and timezone info
+            let ipInfoHTML = '';
+            if (ipInfo && (ipInfo.timezone || ipInfo.ip)) {
+                const timezone = ipInfo.timezone || 'Timezone non disponible';
+                const ipAddress = ipInfo.ip || 'IP non disponible';
+                ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>IP: ${ipAddress}</strong></p>`;
+                console.log('DEBUG: IP info HTML built successfully');
+            } else {
+                console.log('DEBUG: No IP info available, using defaults');
+                ipInfoHTML = `<p>${locationString} - Timezone non disponible</p><p><strong>IP: Non disponible</strong></p>`;
+            }
+            
+            // Update the display with final info
+            console.log('DEBUG: Updating currentConfig innerHTML with new IP info');
+            currentConfig.innerHTML = `
+                <div class="current-config-content">
+                    <i class="fas fa-check-circle"></i>
+                    <div class="current-config-text">
+                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                        ${ipInfoHTML}
+                    </div>
+                </div>
+                <div class="current-config-map">
+                    <div id="currentMap"></div>
+                </div>
+            `;
+            
+            console.log('DEBUG: Scheduling map initialization');
+            // Initialize the map after the DOM is updated
+            setTimeout(() => {
+                console.log('DEBUG: Calling initCurrentMap');
+                initCurrentMap(location);
+            }, 200);
+            
+        } else if (configInfo.reason === 'not_found') {
+            currentConfig.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <div>
+                    <h4>${translations.noActiveConfig}</h4>
+                    <p>${translations.wg0NotFound}</p>
+                </div>
+            `;
+            currentConfig.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+        } else {
+            throw new Error(configInfo.error || translations.unknownErrorChecking);
+        }
+    } catch (error) {
+        console.error('DEBUG: Error in checkCurrentConfigWithIpWait:', error);
+        currentConfig.innerHTML = `
+            <i class="fas fa-times-circle"></i>
+            <div>
+                <h4>${translations.errorChecking}</h4>
+                <p>${translations.cantCheck}</p>
+                <p style="color: red; font-size: 0.8em; margin-top: 10px;">Debug: ${error.message}</p>
+            </div>
+        `;
+        currentConfig.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
     }
 }
 
