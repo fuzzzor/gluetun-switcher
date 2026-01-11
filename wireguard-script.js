@@ -49,6 +49,7 @@ let operationHistory = [];
 let translations = {};
 let locationData = {};
 let mapConfig = {};
+let currentIpInfo = null; // Store current IP information
 
 // DOM Elements
 const refreshBtn = document.getElementById('refreshBtn');
@@ -319,44 +320,130 @@ function selectFile(fileName) {
     }
 }
 
-// Function to fetch IP information from the new API
+// Function to fetch IP information from the primary API with minimal fallbacks
 async function fetchIpInfo() {
+    console.log('DEBUG: Starting fetchIpInfo()');
+    
+    // Try the primary API first with a longer timeout to ensure it works
     try {
-        const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip');
-        if (!response.ok) throw new Error('Erreur API IP');
-        const data = await response.json();
-        currentIpInfo = data;
-        console.log('DEBUG: IP API response data:', data);
-        return data;
+        console.log('DEBUG: Trying primary API: http://192.168.0.242:8000/v1/publicip/ip');
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 seconds timeout
+        
+        const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip', {
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        
+        if (response.ok) {
+            const data = await response.json();
+            console.log('DEBUG: Primary API response:', data);
+            
+            // Use the data exactly as returned by the primary API
+            if (data) {
+                currentIpInfo = data;
+                console.log('DEBUG: Successfully got IP info from primary API:', data);
+                return data;
+            }
+        } else {
+            console.log('DEBUG: Primary API response not OK:', response.status, response.statusText);
+        }
     } catch (error) {
-        console.error('Erreur récupération IP:', error);
-        currentIpInfo = null;
-        return null;
+        console.error('DEBUG: Error with primary API:', error.message);
     }
+    
+    // Only use geolocation API for coordinates if primary API fails
+    try {
+        console.log('DEBUG: Primary API failed, trying geolocation API for coordinates only');
+        if (mapConfig && mapConfig.geolocationApiUrl) {
+            const response = await fetch(mapConfig.geolocationApiUrl);
+            if (response.ok) {
+                const data = await response.json();
+                console.log('DEBUG: Geolocation API data:', data);
+                
+                // Use minimal data from geolocation API, keeping IP and timezone as "Non disponible"
+                currentIpInfo = {
+                    ip: 'Non disponible',
+                    timezone: 'Non disponible',
+                    location: data.location,
+                    latitude: data.latitude || data.lat,
+                    longitude: data.longitude || data.lon || data.lng,
+                    country: data.country || data.country_name || 'Non disponible',
+                    city: data.city || 'Non disponible'
+                };
+                
+                console.log('DEBUG: Using geolocation API for coordinates only:', currentIpInfo);
+                return currentIpInfo;
+            }
+        }
+    } catch (error) {
+        console.error('DEBUG: Geolocation API error:', error);
+    }
+    
+    // Last resort: provide default values
+    console.log('DEBUG: All APIs failed, using default values');
+    currentIpInfo = {
+        ip: 'Non disponible',
+        timezone: 'Non disponible',
+        location: null,
+        latitude: null,
+        longitude: null,
+        country: 'Non disponible',
+        city: 'Non disponible'
+    };
+    
+    return currentIpInfo;
 }
 
 // Checking the current configuration
 async function checkCurrentConfig() {
+    console.log('DEBUG: Starting checkCurrentConfig()');
+    
     try {
         const configInfo = await api.getCurrentConfigInfo();
+        console.log('DEBUG: Config info:', configInfo);
 
         if (configInfo.success) {
             const location = getLocationInfo(configInfo.name);
+            console.log('DEBUG: Location info:', location);
             const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
             
-            // Fetch IP info first
+            // Show loading state first
+            currentConfig.innerHTML = `
+                <div class="current-config-content">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <div class="current-config-text">
+                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                        <p>Récupération des informations IP...</p>
+                    </div>
+                </div>
+                <div class="current-config-map">
+                    <div id="currentMap"></div>
+                </div>
+            `;
+            currentConfig.style.background = '';
+            
+            // Fetch IP info
+            console.log('DEBUG: Fetching IP info...');
             const ipInfo = await fetchIpInfo();
+            console.log('DEBUG: IP info result:', ipInfo);
             
             // Build the display with IP and timezone info
             let ipInfoHTML = '';
-            if (ipInfo) {
-                const timezone = ipInfo.timezone || 'Timezone inconnue';
-                const ipAddress = ipInfo.ip || 'IP inconnue';
-                ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>${ipAddress}</strong></p>`;
+            if (ipInfo && (ipInfo.timezone || ipInfo.ip)) {
+                const timezone = ipInfo.timezone || 'Timezone non disponible';
+                const ipAddress = ipInfo.ip || 'IP non disponible';
+                ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>IP: ${ipAddress}</strong></p>`;
+                console.log('DEBUG: IP info HTML built successfully');
             } else {
-                ipInfoHTML = `<p>${locationString}</p>`;
+                console.log('DEBUG: No IP info available, using defaults');
+                ipInfoHTML = `<p>${locationString} - Timezone non disponible</p><p><strong>IP: Non disponible</strong></p>`;
             }
             
+            // Update the display with final info
+            console.log('DEBUG: Updating currentConfig innerHTML with IP info');
             currentConfig.innerHTML = `
                 <div class="current-config-content">
                     <i class="fas fa-check-circle"></i>
@@ -369,10 +456,13 @@ async function checkCurrentConfig() {
                     <div id="currentMap"></div>
                 </div>
             `;
-            currentConfig.style.background = '';
             
-            // Initialize the map after the DOM is created
-            setTimeout(() => initCurrentMap(location), 100);
+            console.log('DEBUG: Scheduling map initialization');
+            // Initialize the map after the DOM is updated
+            setTimeout(() => {
+                console.log('DEBUG: Calling initCurrentMap');
+                initCurrentMap(location);
+            }, 200);
             
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
@@ -388,20 +478,19 @@ async function checkCurrentConfig() {
             throw new Error(configInfo.error || translations.unknownErrorChecking);
         }
     } catch (error) {
+        console.error('DEBUG: Error in checkCurrentConfig:', error);
         currentConfig.innerHTML = `
             <i class="fas fa-times-circle"></i>
             <div>
                 <h4>${translations.errorChecking}</h4>
                 <p>${translations.cantCheck}</p>
+                <p style="color: red; font-size: 0.8em; margin-top: 10px;">Debug: ${error.message}</p>
             </div>
         `;
         currentConfig.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
-        console.error('Erreur dans checkCurrentConfig:', error);
     }
 }
 
-// Global variable to store current IP info
-let currentIpInfo = null;
 
 // Initialize the MapLibre map in the #currentMap container using the stored IP data
 async function initCurrentMap(locationInfo) {
