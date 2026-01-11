@@ -354,27 +354,37 @@ async function fetchIpInfo() {
         console.error('DEBUG: Error with primary API:', error.message);
     }
     
-    // Only use geolocation API for coordinates if primary API fails
+    // Use geolocation API as fallback
     try {
-        console.log('DEBUG: Primary API failed, trying geolocation API for coordinates only');
+        console.log('DEBUG: Primary API failed, trying geolocation API as fallback');
         if (mapConfig && mapConfig.geolocationApiUrl) {
             const response = await fetch(mapConfig.geolocationApiUrl);
             if (response.ok) {
                 const data = await response.json();
                 console.log('DEBUG: Geolocation API data:', data);
                 
-                // Use minimal data from geolocation API, keeping IP and timezone as "Non disponible"
+                // Parse coordinates from location string "47.366829,8.549790"
+                let lat = null, lon = null;
+                if (data.location && typeof data.location === 'string') {
+                    const coords = data.location.split(',');
+                    if (coords.length === 2) {
+                        lat = parseFloat(coords[0]);
+                        lon = parseFloat(coords[1]);
+                    }
+                }
+                
+                // Use data from geolocation API properly
                 currentIpInfo = {
-                    ip: 'Non disponible',
-                    timezone: 'Non disponible',
+                    ip: data.public_ip || data.ip || 'Non disponible',
+                    timezone: data.timezone || 'Non disponible',
                     location: data.location,
-                    latitude: data.latitude || data.lat,
-                    longitude: data.longitude || data.lon || data.lng,
+                    latitude: lat || data.latitude || data.lat,
+                    longitude: lon || data.longitude || data.lon || data.lng,
                     country: data.country || data.country_name || 'Non disponible',
                     city: data.city || 'Non disponible'
                 };
                 
-                console.log('DEBUG: Using geolocation API for coordinates only:', currentIpInfo);
+                console.log('DEBUG: Using geolocation API data:', currentIpInfo);
                 return currentIpInfo;
             }
         }
