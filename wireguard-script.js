@@ -319,6 +319,22 @@ function selectFile(fileName) {
     }
 }
 
+// Function to fetch IP information from the new API
+async function fetchIpInfo() {
+    try {
+        const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip');
+        if (!response.ok) throw new Error('Erreur API IP');
+        const data = await response.json();
+        currentIpInfo = data;
+        console.log('DEBUG: IP API response data:', data);
+        return data;
+    } catch (error) {
+        console.error('Erreur récupération IP:', error);
+        currentIpInfo = null;
+        return null;
+    }
+}
+
 // Checking the current configuration
 async function checkCurrentConfig() {
     try {
@@ -328,14 +344,14 @@ async function checkCurrentConfig() {
             const location = getLocationInfo(configInfo.name);
             const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
             
-            // Initialize the map first to get the IP info
-            await initCurrentMap(location);
+            // Fetch IP info first
+            const ipInfo = await fetchIpInfo();
             
             // Build the display with IP and timezone info
             let ipInfoHTML = '';
-            if (currentIpInfo) {
-                const timezone = currentIpInfo.timezone || 'Timezone inconnue';
-                const ipAddress = currentIpInfo.ip || 'IP inconnue';
+            if (ipInfo) {
+                const timezone = ipInfo.timezone || 'Timezone inconnue';
+                const ipAddress = ipInfo.ip || 'IP inconnue';
                 ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>${ipAddress}</strong></p>`;
             } else {
                 ipInfoHTML = `<p>${locationString}</p>`;
@@ -354,6 +370,10 @@ async function checkCurrentConfig() {
                 </div>
             `;
             currentConfig.style.background = '';
+            
+            // Initialize the map after the DOM is created
+            setTimeout(() => initCurrentMap(location), 100);
+            
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>
@@ -383,25 +403,26 @@ async function checkCurrentConfig() {
 // Global variable to store current IP info
 let currentIpInfo = null;
 
-// Initialize the MapLibre map in the #currentMap container using the new API
+// Initialize the MapLibre map in the #currentMap container using the stored IP data
 async function initCurrentMap(locationInfo) {
     const mapContainer = document.getElementById('currentMap');
-    if (!mapContainer) return;
+    if (!mapContainer) {
+        console.log('DEBUG: Map container not found');
+        return;
+    }
 
     mapContainer.innerHTML = '';
 
     try {
-        // Use the new API URL for IP and location information
-        const geolocationUrl = 'http://192.168.0.242:8000/v1/publicip/ip';
-        
-        const resp = await fetch(geolocationUrl);
-        if (!resp.ok) throw new Error('Erreur API position');
-        const data = await resp.json();
+        // Use already fetched IP data
+        const data = currentIpInfo;
+        if (!data) {
+            console.log('DEBUG: No IP data available');
+            mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
+            return;
+        }
 
-        console.log('DEBUG: API response data:', data);
-        
-        // Store the IP info globally for use in other functions
-        currentIpInfo = data;
+        console.log('DEBUG: Using stored IP data:', data);
 
         // Parse coordinates from location string format "47.498249,19.039780"
         let lat = null, lon = null;
@@ -435,6 +456,7 @@ async function initCurrentMap(locationInfo) {
         console.log('DEBUG: Final coordinates for map:', lat, lon);
 
         if (!window.maplibregl) {
+            console.log('DEBUG: MapLibre not available');
             // Show fallback image when map library is not loaded
             mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
             return;
@@ -443,10 +465,13 @@ async function initCurrentMap(locationInfo) {
         // Use configured map tile URL
         const mapTileUrl = mapConfig.mapTileUrl;
         if (!mapTileUrl) {
+            console.log('DEBUG: No map tile URL configured');
             // Show fallback image when map tile URL is not configured
             mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
             return;
         }
+
+        console.log('DEBUG: Creating map with tile URL:', mapTileUrl);
 
         // Create map
         const map = new maplibregl.Map({
@@ -464,6 +489,8 @@ async function initCurrentMap(locationInfo) {
             const popup = new maplibregl.Popup({ offset: 25 }).setText(`${locationInfo.name}${locationInfo.city ? (', ' + locationInfo.city) : ''}`);
             new maplibregl.Marker().setLngLat([Number(lon), Number(lat)]).setPopup(popup).addTo(map);
         }
+
+        console.log('DEBUG: Map created successfully');
 
     } catch (error) {
         console.error('Erreur initialisation carte:', error);

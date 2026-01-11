@@ -2,7 +2,7 @@
   "users": [
     {
       "username": "admin",
-      "passwordHash": "",
+      "passwordHash": "$argon2id$v=19$m=65536,t=3,p=4$RRRZnYaZv4HZ+MmEYb6oog$6KAQajL09S2KjK/Uj2LL0Yv090LFNPLAu/E2kuZBSQ8",
       "mustChangePassword": true,
       "failedAttempts": 0,
       "lockedUntil": null
