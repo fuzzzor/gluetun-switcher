@@ -118,7 +118,7 @@
   "signIn": "Se connecter",
   "loginError": "Identifiants invalides ou utilisateur inconnu",
   "accountLocked": "Compte verrouillé",
-  "changePasswordTitle": "Changer le mot de passe",
+  "changePasswordTitle": "Changement de mot de passe",
   "newPassword": "Nouveau mot de passe",
   "updatePasswordButton": "Mettre à jour le mot de passe",
   "policyMinLength": "Longueur minimum : {length}",

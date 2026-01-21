@@ -42,7 +42,8 @@ app.use(session({
     // - SameSite=None REQUIRES Secure=true (HTTPS), otherwise browsers drop the cookie
     // - In HTTP (local/Docker), use Lax so cookies are sent
     sameSite: isHttps ? 'none' : 'lax',
-    secure: isHttps
+    secure: isHttps,
+    maxAge: 60 * 60 * 1000 // 1 hour in milliseconds
   }
 }));
 

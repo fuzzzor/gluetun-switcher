@@ -5,7 +5,7 @@
   <title data-i18n="loginTitle">Gluetun-Switcher – Login</title>
   <style>
     body { font-family: Arial, sans-serif; background:#705EBD; color:#e5e7eb; display:flex; align-items:center; justify-content:center; height:100vh; }
-    .login { background:#2563eb; padding:2rem; border-radius:8px; width:320px; box-shadow:0 10px 30px rgba(0,0,0,.5); }
+    .login { background:#2563eb; padding:2rem; border-radius:8px; width:320px; box-shadow:0 10px 30px rgba(0,0,0,.5); position:relative; padding-top:3.5rem; }
     h1 { margin-top:0; text-align:center; }
     label { display:block; margin-top:1rem; }
     input { width:100%; padding:.5rem; margin-top:.25rem; border-radius:4px; border:1px solid #334155; background:#343538; color:#e5e7eb; }
@@ -16,11 +16,11 @@
 </head>
 <body>
   <form class="login" onsubmit="login(); return false;">
-    <img src="/icons/logoswitcher.png" alt="Gluetun-Switcher" style="display:block;margin:0 auto 1rem auto;max-width:120px;" />
+    <img src="/icons/logoswitcher.png" alt="Gluetun-Switcher" style="position:absolute; top:-70px; left:50%; transform:translateX(-50%); max-width:120px;" />
     <h1>Gluetun-Switcher</h1>
     <label>
       <span data-i18n="username">Username</span>
-      <input id="username" autocomplete="username" />
+      <input id="username" autocomplete="username" autofocus />
     </label>
     <label>
       <span data-i18n="password">Password</span>
