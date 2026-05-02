@@ -426,37 +426,6 @@
     <script src="https://unpkg.com/maplibre-gl@2.4.0/dist/maplibre-gl.js"></script>
     <script src="wireguard-script.js"></script>
     <script>
-      // Fix collapse toggle: only the chevron button controls the collapse
-      document.querySelectorAll('.card-header[data-collapsible]').forEach(header => {
-        const targetId = header.dataset.collapsible;
-        const content = document.getElementById(targetId);
-        const toggle = header.querySelector('.collapse-toggle');
-        const icon = toggle.querySelector('i');
-
-        // Ensure initial state: collapsed
-        content.classList.add('hidden');
-        toggle.setAttribute('aria-expanded', 'false');
-        icon.className = 'fas fa-chevron-up';
-
-        toggle.addEventListener('click', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const expanded = toggle.getAttribute('aria-expanded') === 'true';
-
-          if (expanded) {
-            content.classList.add('hidden');
-            icon.className = 'fas fa-chevron-up';
-            toggle.setAttribute('aria-expanded', 'false');
-          } else {
-            content.classList.remove('hidden');
-            icon.className = 'fas fa-chevron-down';
-            toggle.setAttribute('aria-expanded', 'true');
-          }
-        });
-      });
-    </script>
-    <script>
       // User Menu Logic
       const userMenuBtn = document.getElementById('userMenuBtn');
       const userDropdown = document.getElementById('userDropdown');

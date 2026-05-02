@@ -205,27 +205,26 @@ function initializeEventListeners() {
 
         if (!content || !toggleButton || !toggleIcon) return;
 
-        // Collapse history by default
-        if (contentId === 'historyContent') {
+        // Ensure proper initial state for accessibility
+        const isCurrentlyCollapsed = content.classList.contains('collapsed');
+        toggleButton.setAttribute('aria-expanded', !isCurrentlyCollapsed);
+
+        // Collapse history by default if not already set
+        if (contentId === 'historyContent' && !content.classList.contains('collapsed')) {
             content.classList.add('collapsed');
             toggleIcon.classList.add('rotated');
+            toggleButton.setAttribute('aria-expanded', 'false');
         }
 
         const toggle = () => {
-            content.classList.toggle('collapsed');
+            const isCollapsed = content.classList.toggle('collapsed');
             toggleIcon.classList.toggle('rotated');
+            toggleButton.setAttribute('aria-expanded', !isCollapsed);
         };
 
-        // Click on header (excluding button)
-        header.addEventListener('click', (e) => {
-            if (e.target.closest('.collapse-toggle')) return;
-            toggle();
-        });
-
-        // Click directly on chevron button
-        toggleButton.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
+        // Header click handles everything (including the button via propagation)
+        header.style.cursor = 'pointer';
+        header.addEventListener('click', () => {
             toggle();
         });
     });
