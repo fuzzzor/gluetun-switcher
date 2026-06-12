@@ -129,5 +129,8 @@
   "policySpecial": "caractère spécial",
   "policyLoading": "Chargement de la politique...",
   "passwordUpdateSuccess": "Mot de passe mis à jour avec succès",
-  "networkError": "Erreur réseau ou serveur inaccessible"
+  "networkError": "Erreur réseau ou serveur inaccessible",
+  "notAvailable": "Non disponible",
+  "timezoneNotAvailable": "Timezone non disponible",
+  "ipNotAvailable": "IP non disponible"
 }

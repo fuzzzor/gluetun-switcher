@@ -129,5 +129,8 @@
   "policySpecial": "special character",
   "policyLoading": "Loading password policy...",
   "passwordUpdateSuccess": "Password updated successfully",
-  "networkError": "Network error or server unreachable"
+  "networkError": "Network error or server unreachable",
+  "notAvailable": "Not available",
+  "timezoneNotAvailable": "Timezone not available",
+  "ipNotAvailable": "IP not available"
 }

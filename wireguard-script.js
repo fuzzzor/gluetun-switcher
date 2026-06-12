@@ -323,20 +323,7 @@ function selectFile(fileName) {
 
 // Function to get current IP from any working API
 async function getCurrentIpOnly() {
-    // Try primary API first
-    try {
-        const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip', {
-            signal: AbortSignal.timeout(3000)
-        });
-        if (response.ok) {
-            const data = await response.json();
-            return data.ip || null;
-        }
-    } catch (error) {
-        // Silent fail, try next API
-    }
-    
-    // Try geolocation API
+    // Try geolocation API (configured via environment)
     try {
         if (mapConfig && mapConfig.geolocationApiUrl) {
             const response = await fetch(mapConfig.geolocationApiUrl, {
@@ -356,17 +343,13 @@ async function getCurrentIpOnly() {
 
 // Function to wait for IP change after VPN switch
 async function waitForIpChange(expectedOldIp, maxWaitTime = 30000) {
-    console.log(`DEBUG: Waiting for IP to change from ${expectedOldIp}...`);
-    
     const startTime = Date.now();
     const checkInterval = 2000; // Check every 2 seconds
     
     while (Date.now() - startTime < maxWaitTime) {
         const currentIp = await getCurrentIpOnly();
-        console.log(`DEBUG: Current IP check: ${currentIp} (waiting for change from ${expectedOldIp})`);
         
         if (currentIp && currentIp !== expectedOldIp) {
-            console.log(`DEBUG: IP changed from ${expectedOldIp} to ${currentIp}!`);
             return true;
         }
         
@@ -374,62 +357,27 @@ async function waitForIpChange(expectedOldIp, maxWaitTime = 30000) {
         await new Promise(resolve => setTimeout(resolve, checkInterval));
     }
     
-    console.log(`DEBUG: Timeout waiting for IP change after ${maxWaitTime}ms`);
     return false;
 }
 
 // Function to fetch IP information with smart waiting for VPN changes
 async function fetchIpInfo(waitForChange = false) {
-    console.log('DEBUG: Starting fetchIpInfo(), waitForChange:', waitForChange);
-    
     // If we're waiting for a change, do the smart waiting first
     if (waitForChange && lastKnownIp) {
-        console.log(`DEBUG: Waiting for IP to change from last known IP: ${lastKnownIp}`);
         isWaitingForIpChange = true;
-        
-        // Wait for IP to change
-        const ipChanged = await waitForIpChange(lastKnownIp, 30000);
-        
-        if (!ipChanged) {
-            console.log('DEBUG: IP did not change within timeout, proceeding anyway');
-        }
-        
+        await waitForIpChange(lastKnownIp, 30000);
         isWaitingForIpChange = false;
     }
     
-    // Try the primary API first
+    // Try the geolocation API (configured via environment)
     try {
-        console.log('DEBUG: Trying primary API: http://192.168.0.242:8000/v1/publicip/ip');
-        
-        const response = await fetch('http://192.168.0.242:8000/v1/publicip/ip', {
-            signal: AbortSignal.timeout(8000)
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('DEBUG: Primary API response:', data);
-            
-            if (data && data.ip) {
-                lastKnownIp = data.ip; // Store for future change detection
-                currentIpInfo = data;
-                console.log('DEBUG: Successfully got IP info from primary API:', data);
-                return data;
-            }
-        } else {
-            console.log('DEBUG: Primary API response not OK:', response.status);
-        }
-    } catch (error) {
-        console.error('DEBUG: Error with primary API:', error.message);
-    }
-    
-    // Use geolocation API as fallback
-    try {
-        console.log('DEBUG: Primary API failed, trying geolocation API as fallback');
         if (mapConfig && mapConfig.geolocationApiUrl) {
-            const response = await fetch(mapConfig.geolocationApiUrl);
+            const response = await fetch(mapConfig.geolocationApiUrl, {
+                signal: AbortSignal.timeout(8000)
+            });
+            
             if (response.ok) {
                 const data = await response.json();
-                console.log('DEBUG: Geolocation API data:', data);
                 
                 // Parse coordinates from location string "47.366829,8.549790"
                 let lat = null, lon = null;
@@ -448,33 +396,31 @@ async function fetchIpInfo(waitForChange = false) {
                 
                 // Use data from geolocation API properly
                 currentIpInfo = {
-                    ip: ipFromGeoApi || 'Non disponible',
-                    timezone: data.timezone || 'Non disponible',
+                    ip: ipFromGeoApi || translations.notAvailable,
+                    timezone: data.timezone || translations.notAvailable,
                     location: data.location,
                     latitude: lat || data.latitude || data.lat,
                     longitude: lon || data.longitude || data.lon || data.lng,
-                    country: data.country || data.country_name || 'Non disponible',
-                    city: data.city || 'Non disponible'
+                    country: data.country || data.country_name || translations.notAvailable,
+                    city: data.city || translations.notAvailable
                 };
                 
-                console.log('DEBUG: Using geolocation API data:', currentIpInfo);
                 return currentIpInfo;
             }
         }
     } catch (error) {
-        console.error('DEBUG: Geolocation API error:', error);
+        console.error('Geolocation API error:', error);
     }
     
     // Last resort: provide default values
-    console.log('DEBUG: All APIs failed, using default values');
     currentIpInfo = {
-        ip: 'Non disponible',
-        timezone: 'Non disponible',
+        ip: translations.notAvailable,
+        timezone: translations.notAvailable,
         location: null,
         latitude: null,
         longitude: null,
-        country: 'Non disponible',
-        city: 'Non disponible'
+        country: translations.notAvailable,
+        city: translations.notAvailable
     };
     
     return currentIpInfo;
@@ -482,15 +428,11 @@ async function fetchIpInfo(waitForChange = false) {
 
 // Checking the current configuration
 async function checkCurrentConfig() {
-    console.log('DEBUG: Starting checkCurrentConfig()');
-    
     try {
         const configInfo = await api.getCurrentConfigInfo();
-        console.log('DEBUG: Config info:', configInfo);
 
         if (configInfo.success) {
             const location = getLocationInfo(configInfo.name);
-            console.log('DEBUG: Location info:', location);
             const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
             
             // Show loading state first
@@ -509,24 +451,19 @@ async function checkCurrentConfig() {
             currentConfig.style.background = '';
             
             // Fetch IP info
-            console.log('DEBUG: Fetching IP info...');
             const ipInfo = await fetchIpInfo(false); // Normal fetch for config check
-            console.log('DEBUG: IP info result:', ipInfo);
             
             // Build the display with IP and timezone info
             let ipInfoHTML = '';
             if (ipInfo && (ipInfo.timezone || ipInfo.ip)) {
-                const timezone = ipInfo.timezone || 'Timezone non disponible';
-                const ipAddress = ipInfo.ip || 'IP non disponible';
+                const timezone = ipInfo.timezone || translations.timezoneNotAvailable;
+                const ipAddress = ipInfo.ip || translations.ipNotAvailable;
                 ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>IP: ${ipAddress}</strong></p>`;
-                console.log('DEBUG: IP info HTML built successfully');
             } else {
-                console.log('DEBUG: No IP info available, using defaults');
-                ipInfoHTML = `<p>${locationString} - Timezone non disponible</p><p><strong>IP: Non disponible</strong></p>`;
+                ipInfoHTML = `<p>${locationString} - ${translations.timezoneNotAvailable}</p><p><strong>IP: ${translations.notAvailable}</strong></p>`;
             }
             
             // Update the display with final info
-            console.log('DEBUG: Updating currentConfig innerHTML with IP info');
             currentConfig.innerHTML = `
                 <div class="current-config-content">
                     <i class="fas fa-check-circle"></i>
@@ -540,10 +477,8 @@ async function checkCurrentConfig() {
                 </div>
             `;
             
-            console.log('DEBUG: Scheduling map initialization');
             // Initialize the map after the DOM is updated
             setTimeout(() => {
-                console.log('DEBUG: Calling initCurrentMap');
                 initCurrentMap(location);
             }, 200);
             
@@ -561,7 +496,7 @@ async function checkCurrentConfig() {
             throw new Error(configInfo.error || translations.unknownErrorChecking);
         }
     } catch (error) {
-        console.error('DEBUG: Error in checkCurrentConfig:', error);
+        console.error('Error in checkCurrentConfig:', error);
         currentConfig.innerHTML = `
             <i class="fas fa-times-circle"></i>
             <div>
@@ -578,10 +513,7 @@ async function checkCurrentConfig() {
 // Initialize the MapLibre map in the #currentMap container using the stored IP data
 async function initCurrentMap(locationInfo) {
     const mapContainer = document.getElementById('currentMap');
-    if (!mapContainer) {
-        console.log('DEBUG: Map container not found');
-        return;
-    }
+    if (!mapContainer) return;
 
     mapContainer.innerHTML = '';
 
@@ -589,46 +521,34 @@ async function initCurrentMap(locationInfo) {
         // Use already fetched IP data
         const data = currentIpInfo;
         if (!data) {
-            console.log('DEBUG: No IP data available');
             mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
             return;
         }
-
-        console.log('DEBUG: Using stored IP data:', data);
 
         // Parse coordinates from location string format "47.498249,19.039780"
         let lat = null, lon = null;
         
         if (data.location && typeof data.location === 'string') {
-            console.log('DEBUG: Found location string:', data.location);
             const coords = data.location.split(',');
-            console.log('DEBUG: Split coords:', coords);
             if (coords.length === 2) {
                 lat = parseFloat(coords[0]);
                 lon = parseFloat(coords[1]);
-                console.log('DEBUG: Parsed coordinates:', lat, lon);
             }
         }
         
         // Fallback to common property names if location string format not available
         if (lat === null || lon === null) {
-            console.log('DEBUG: Using fallback coordinates from:', data);
             lat = data.latitude ?? data.lat ?? null;
             lon = data.longitude ?? data.lon ?? data.lng ?? null;
-            console.log('DEBUG: Fallback coordinates:', lat, lon);
         }
 
         if (lat == null || lon == null) {
-            console.log('DEBUG: No valid coordinates found');
             // Show fallback image when coordinates are not available
             mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
             return;
         }
 
-        console.log('DEBUG: Final coordinates for map:', lat, lon);
-
         if (!window.maplibregl) {
-            console.log('DEBUG: MapLibre not available');
             // Show fallback image when map library is not loaded
             mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
             return;
@@ -637,13 +557,10 @@ async function initCurrentMap(locationInfo) {
         // Use configured map tile URL
         const mapTileUrl = mapConfig.mapTileUrl;
         if (!mapTileUrl) {
-            console.log('DEBUG: No map tile URL configured');
             // Show fallback image when map tile URL is not configured
             mapContainer.innerHTML = `<div style="height: 100%; display: flex; align-items: center; justify-content: center;"><img src="icons/nondispo.jpg" alt="Carte non disponible" style="max-width: 100%; max-height: 100%; border-radius: 8px;"></div>`;
             return;
         }
-
-        console.log('DEBUG: Creating map with tile URL:', mapTileUrl);
 
         // Create map
         const map = new maplibregl.Map({
@@ -661,8 +578,6 @@ async function initCurrentMap(locationInfo) {
             const popup = new maplibregl.Popup({ offset: 25 }).setText(`${locationInfo.name}${locationInfo.city ? (', ' + locationInfo.city) : ''}`);
             new maplibregl.Marker().setLngLat([Number(lon), Number(lat)]).setPopup(popup).addTo(map);
         }
-
-        console.log('DEBUG: Map created successfully');
 
     } catch (error) {
         console.error('Erreur initialisation carte:', error);
@@ -757,15 +672,11 @@ async function executeActivation() {
 
 // Special version of checkCurrentConfig that waits for IP change
 async function checkCurrentConfigWithIpWait() {
-    console.log('DEBUG: Starting checkCurrentConfigWithIpWait()');
-    
     try {
         const configInfo = await api.getCurrentConfigInfo();
-        console.log('DEBUG: Config info:', configInfo);
 
         if (configInfo.success) {
             const location = getLocationInfo(configInfo.name);
-            console.log('DEBUG: Location info:', location);
             const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
             
             // Show waiting state
@@ -784,24 +695,19 @@ async function checkCurrentConfigWithIpWait() {
             currentConfig.style.background = '';
             
             // Fetch IP info with smart waiting for change
-            console.log('DEBUG: Fetching IP info with change detection...');
             const ipInfo = await fetchIpInfo(true); // Wait for IP change
-            console.log('DEBUG: IP info result after waiting:', ipInfo);
             
             // Build the display with IP and timezone info
             let ipInfoHTML = '';
             if (ipInfo && (ipInfo.timezone || ipInfo.ip)) {
-                const timezone = ipInfo.timezone || 'Timezone non disponible';
-                const ipAddress = ipInfo.ip || 'IP non disponible';
+                const timezone = ipInfo.timezone || translations.timezoneNotAvailable;
+                const ipAddress = ipInfo.ip || translations.ipNotAvailable;
                 ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>IP: ${ipAddress}</strong></p>`;
-                console.log('DEBUG: IP info HTML built successfully');
             } else {
-                console.log('DEBUG: No IP info available, using defaults');
-                ipInfoHTML = `<p>${locationString} - Timezone non disponible</p><p><strong>IP: Non disponible</strong></p>`;
+                ipInfoHTML = `<p>${locationString} - ${translations.timezoneNotAvailable}</p><p><strong>IP: ${translations.notAvailable}</strong></p>`;
             }
             
             // Update the display with final info
-            console.log('DEBUG: Updating currentConfig innerHTML with new IP info');
             currentConfig.innerHTML = `
                 <div class="current-config-content">
                     <i class="fas fa-check-circle"></i>
@@ -815,10 +721,8 @@ async function checkCurrentConfigWithIpWait() {
                 </div>
             `;
             
-            console.log('DEBUG: Scheduling map initialization');
             // Initialize the map after the DOM is updated
             setTimeout(() => {
-                console.log('DEBUG: Calling initCurrentMap');
                 initCurrentMap(location);
             }, 200);
             
@@ -835,7 +739,7 @@ async function checkCurrentConfigWithIpWait() {
             throw new Error(configInfo.error || translations.unknownErrorChecking);
         }
     } catch (error) {
-        console.error('DEBUG: Error in checkCurrentConfigWithIpWait:', error);
+        console.error('Error in checkCurrentConfigWithIpWait:', error);
         currentConfig.innerHTML = `
             <i class="fas fa-times-circle"></i>
             <div>
