@@ -174,8 +174,10 @@ async function fetchGluetunApi(path) {
 app.get('/api/gluetun/vpn-status', async (req, res) => {
   try {
     const data = await fetchGluetunApi('/v1/vpn/status');
+    console.log('[Gluetun] vpn-status raw:', JSON.stringify(data));
     res.json({ success: true, ...data });
   } catch (error) {
+    console.error('[Gluetun] vpn-status error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -184,8 +186,10 @@ app.get('/api/gluetun/vpn-status', async (req, res) => {
 app.get('/api/gluetun/dns-status', async (req, res) => {
   try {
     const data = await fetchGluetunApi('/v1/dns/status');
+    console.log('[Gluetun] dns-status raw:', JSON.stringify(data));
     res.json({ success: true, ...data });
   } catch (error) {
+    console.error('[Gluetun] dns-status error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -599,7 +603,8 @@ async function pollVpnStatus() {
   let status = 'unknown';
   try {
     const data = await fetchGluetunApi('/v1/vpn/status');
-    const s = (data.status || '').toLowerCase();
+    // Gluetun ≥ v3.38 uses "outcome" instead of "status"
+    const s = (data.outcome || data.status || '').toLowerCase();
     if (s === 'running') status = 'connected';
     else if (s === 'stopped' || s === 'disabled') status = 'disconnected';
     else if (s === 'starting') status = 'paused';

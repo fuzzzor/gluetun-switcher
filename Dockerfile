@@ -10,8 +10,8 @@ COPY package*.json ./
 # Update/Upgrade Alpine packages and install build tools (argon2 native deps)
 RUN apk -U upgrade && apk add --no-cache g++ make python3 linux-headers openssl
 
-# Install production dependencies
-RUN npm install --production
+# Install production dependencies (--omit=dev replaces deprecated --production flag)
+RUN npm install --omit=dev
 
 # Copy the default configuration to a separate directory
 COPY config/ /app-defaults/

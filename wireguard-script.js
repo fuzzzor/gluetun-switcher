@@ -485,6 +485,7 @@ async function loadGluetunPanels(ipInfo, locationInfo, configName) {
     // ── VPN status (/v1/vpn/status — works for WireGuard AND OpenVPN) ─────────
     try {
         const vpnStatus = await api.getGluetunVpnStatus();
+        console.debug('[Gluetun] vpn-status raw:', JSON.stringify(vpnStatus));
         const status = vpnStatus.status || vpnStatus.Status || null;
         setVal('gvStatus', status, resolveStatusClass(status));
     } catch (e) {
@@ -540,6 +541,7 @@ async function loadGluetunPanels(ipInfo, locationInfo, configName) {
     // ── DNS status ────────────────────────────────────────────────────────────
     try {
         const dnsStatus = await api.getGluetunDnsStatus();
+        console.debug('[Gluetun] dns-status raw:', JSON.stringify(dnsStatus));
         const status = dnsStatus.status || dnsStatus.Status || null;
         setVal('gdStatus', status, resolveStatusClass(status));
     } catch (e) {

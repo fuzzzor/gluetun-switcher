@@ -28,5 +28,10 @@
   "homepage": "https://github.com/fuzzzor/gluetun-switcher#readme",
   "devDependencies": {
     "cross-env": "^10.1.0"
+  },
+  "overrides": {
+    "rimraf": "^5.0.0",
+    "glob": "^11.0.0",
+    "inflight": "^1.0.6"
   }
 }
