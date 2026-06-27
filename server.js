@@ -162,6 +162,136 @@ app.get('/api/geolocation', async (req, res) => {
   }
 });
 
+// Helper to call Gluetun API
+async function fetchGluetunApi(path) {
+  const base = (process.env.GLUETUN_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+  const response = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(5000) });
+  if (!response.ok) throw new Error(`Gluetun API ${path} responded with ${response.status}`);
+  return response.json();
+}
+
+// Proxy: Gluetun VPN status (works for both WireGuard and OpenVPN)
+app.get('/api/gluetun/vpn-status', async (req, res) => {
+  try {
+    const data = await fetchGluetunApi('/v1/vpn/status');
+    res.json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Proxy: Gluetun DNS status
+app.get('/api/gluetun/dns-status', async (req, res) => {
+  try {
+    const data = await fetchGluetunApi('/v1/dns/status');
+    res.json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Proxy: Gluetun port forwarding status
+app.get('/api/gluetun/portforwarding', async (req, res) => {
+  try {
+    const data = await fetchGluetunApi('/v1/portforwarding/status');
+    res.json({ success: true, ...data });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Helper: search Gluetun server JSON files for an IP match → returns provider name
+async function findProviderByIp(serverIp) {
+  const serversDir = process.env.GLUETUN_SERVERS_DIR || '/gluetun-servers';
+  try {
+    const files = await fs.readdir(serversDir);
+    const jsonFiles = files.filter(f => f.endsWith('.json'));
+
+    for (const file of jsonFiles) {
+      try {
+        const raw = await fs.readFile(path.join(serversDir, file), 'utf8');
+        const data = JSON.parse(raw);
+
+        // Gluetun server files shape: { servers: [ { ips: [...] } ] } or { servers: [ { ip: "..." } ] }
+        const servers = data.servers || data.Servers || (Array.isArray(data) ? data : null);
+        if (!Array.isArray(servers)) continue;
+
+        const ipOctets3 = serverIp.split('.').slice(0, 3).join('.');
+        const found = servers.some(s => {
+          const ips = s.ips || s.IPs || (s.ip ? [s.ip] : []);
+          return ips.some(ip => ip === serverIp || ip.startsWith(ipOctets3 + '.'));
+        });
+
+        if (found) {
+          // Provider name = JSON filename without extension (e.g. "protonvpn.json" → "protonvpn")
+          return path.basename(file, '.json');
+        }
+      } catch {
+        // Skip malformed files
+      }
+    }
+  } catch {
+    // serversDir not mounted or not accessible — silently ignore
+  }
+  return null;
+}
+
+// Detect VPN type, server host and provider from wg0.conf (+ Gluetun server JSON files)
+app.get('/api/gluetun/vpn-type', async (req, res) => {
+  const wireguardDir = process.env.WIREGUARD_DIR;
+  if (!wireguardDir) {
+    return res.json({ success: false, vpn_type: null, provider: null, error: 'WIREGUARD_DIR not set' });
+  }
+  try {
+    const wg0Path = path.join(wireguardDir, 'wg0.conf');
+    const content = await fs.readFile(wg0Path, 'utf8');
+
+    // WireGuard configs contain [Interface] + [Peer] + PrivateKey
+    const isWireGuard = content.includes('[Interface]') && content.includes('[Peer]') && content.includes('PrivateKey');
+    const vpn_type = isWireGuard ? 'wireguard' : 'openvpn';
+
+    // Extract the VPN server host/IP from config
+    let serverHost = null;
+    if (isWireGuard) {
+      // Endpoint = 185.159.158.1:51820  OR  node.protonvpn.net:51820
+      const m = content.match(/^\s*Endpoint\s*=\s*([^\s:\[]+)/mi);
+      if (m) serverHost = m[1].trim();
+    } else {
+      // OpenVPN: remote <host> <port>
+      const m = content.match(/^\s*remote\s+([^\s]+)/mi);
+      if (m) serverHost = m[1].trim();
+    }
+
+    let provider = null;
+    const knownProviders = ['protonvpn', 'mullvad', 'nordvpn', 'expressvpn', 'surfshark', 'ipvanish', 'cyberghost', 'hidemyass', 'pia', 'privado'];
+
+    if (serverHost) {
+      const isIp = /^\d+\.\d+\.\d+\.\d+$/.test(serverHost);
+
+      if (isIp) {
+        // Try to match IP against Gluetun server JSON files
+        provider = await findProviderByIp(serverHost);
+      }
+
+      // Fallback: extract from hostname keywords
+      if (!provider) {
+        const hostLower = serverHost.toLowerCase();
+        provider = knownProviders.find(p => hostLower.includes(p)) || null;
+      }
+
+      // Fallback: use second-level domain of hostname
+      if (!provider && !isIp) {
+        const parts = serverHost.split('.');
+        if (parts.length >= 2) provider = parts[parts.length - 2];
+      }
+    }
+
+    res.json({ success: true, vpn_type, provider, server_host: serverHost });
+  } catch (error) {
+    res.json({ success: false, vpn_type: null, provider: null, error: error.message });
+  }
+});
+
 // Protect sensitive HTML files from direct static access
 app.use((req, res, next) => {
   if (req.path === '/change-password.html' || req.path === '/gluetun-switcher.html') {
@@ -448,6 +578,55 @@ app.route('/api/operation-history')
       }
     }
   });
+
+// ── VPN Status History (last 30 polls, polled every 30s server-side) ──────────
+const vpnStatusHistoryPath = path.join(__dirname, 'config', 'vpn-status-history.json');
+const VPN_HISTORY_MAX = 30;
+const VPN_POLL_INTERVAL_MS = 30000; // 30 seconds
+
+// Load persisted history or start fresh
+let vpnStatusHistory = [];
+(async () => {
+  try {
+    const raw = await fs.readFile(vpnStatusHistoryPath, 'utf8');
+    vpnStatusHistory = JSON.parse(raw);
+  } catch {
+    vpnStatusHistory = [];
+  }
+})();
+
+async function pollVpnStatus() {
+  let status = 'unknown';
+  try {
+    const data = await fetchGluetunApi('/v1/vpn/status');
+    const s = (data.status || '').toLowerCase();
+    if (s === 'running') status = 'connected';
+    else if (s === 'stopped' || s === 'disabled') status = 'disconnected';
+    else if (s === 'starting') status = 'paused';
+    else status = 'unknown';
+  } catch {
+    status = 'unknown';
+  }
+
+  vpnStatusHistory.push({ status, ts: Date.now() });
+  if (vpnStatusHistory.length > VPN_HISTORY_MAX) {
+    vpnStatusHistory = vpnStatusHistory.slice(-VPN_HISTORY_MAX);
+  }
+
+  // Persist asynchronously (no await — fire and forget)
+  fs.writeFile(vpnStatusHistoryPath, JSON.stringify(vpnStatusHistory)).catch(() => {});
+}
+
+// Start polling after a short delay (give time for Gluetun to be ready)
+setTimeout(() => {
+  pollVpnStatus();
+  setInterval(pollVpnStatus, VPN_POLL_INTERVAL_MS);
+}, 5000);
+
+// GET endpoint — returns the last 30 status polls
+app.get('/api/gluetun/vpn-history', (req, res) => {
+  res.json({ success: true, history: vpnStatusHistory });
+});
 
 // Public login page
 app.get('/login', (req, res) => {

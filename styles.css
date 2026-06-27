@@ -671,8 +671,215 @@ body {
     gap: 15px;
 }
 
-.current-config i {
+.current-config > i,
+.current-config-spinner {
     font-size: 1.5rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.8rem;
+}
+
+/* ── Gluetun info panels ── */
+.gluetun-panels {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.gluetun-panels-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+.ginfo-panel {
+    background: var(--white);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.ginfo-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--border-color);
+    background: linear-gradient(135deg, var(--success-color), #047857);
+}
+
+.ginfo-panel-icon {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.ginfo-panel-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--white);
+}
+
+.ginfo-panel-body {
+    padding: 4px 0;
+}
+
+.ginfo-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 9px 16px;
+    border-bottom: 1px solid var(--border-color);
+    gap: 12px;
+}
+
+.ginfo-row:last-child {
+    border-bottom: none;
+}
+
+.ginfo-label {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.ginfo-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: right;
+    word-break: break-all;
+}
+
+.ginfo-value--mono {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.78rem;
+}
+
+.ginfo-value.status-running {
+    color: var(--success-color);
+}
+
+.ginfo-value.status-stopped {
+    color: var(--danger-color);
+}
+
+.ginfo-value.status-unknown {
+    color: var(--text-secondary);
+}
+
+/* Protocol badge (WireGuard logo inside panel) */
+.ginfo-protocol-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 16px 12px;
+}
+
+.protocol-logo {
+    height: 72px;
+    width: auto;
+    opacity: 0.9;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.15));
+}
+
+/* ── VPN Status History panel ── */
+.vpn-history-panel {
+    margin-top: 16px;
+    background: var(--white);
+    border: 2px solid var(--border-color);
+    border-radius: var(--border-radius);
+    overflow: hidden;
+    box-shadow: var(--shadow);
+}
+
+.vpn-history-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 2px solid var(--border-color);
+    background: linear-gradient(135deg, var(--success-color), #047857);
+}
+
+.vpn-history-icon {
+    color: rgba(255,255,255,0.9);
+    font-size: 1rem;
+    width: 20px;
+    text-align: center;
+}
+
+.vpn-history-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--white);
+}
+
+.vpn-history-squares {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    padding: 14px 16px 10px;
+}
+
+.vpn-sq {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.sq-connected    { background: #10b981; }
+.sq-paused       { background: #f59e0b; }
+.sq-disconnected { background: #ef4444; }
+.sq-unknown      { background: #94a3b8; }
+
+.vpn-history-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 0 16px 12px;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+.vpn-history-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.vpn-history-legend-item .vpn-sq {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+}
+
+/* Map inside the card (standalone, below panels) */
+.current-config-map {
+    margin-top: 16px;
+    height: 220px;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#currentMap {
+    height: 100%;
+    width: 100%;
+    border-radius: 10px;
+}
+
+@media (max-width: 768px) {
+    .gluetun-panels-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 .demo-note {

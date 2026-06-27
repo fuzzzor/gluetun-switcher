@@ -331,12 +331,96 @@
                     <h2><i class="fas fa-check-circle"></i> <span data-i18n="currentConfig">Current Configuration</span></h2>
                 </div>
                 <div class="card-body">
+                    <!-- VPN status banner -->
                     <div id="currentConfig" class="current-config">
-                        <i class="fas fa-cog fa-spin"></i>
+                        <span class="current-config-spinner"><i class="fas fa-circle-notch fa-spin"></i></span>
                         <div>
                             <h4 data-i18n="checking">Checking...</h4>
                             <p data-i18n="readingConfig">Reading active configuration</p>
                         </div>
+                    </div>
+
+                    <!-- Info panels grid (Gluetun data) -->
+                    <div class="gluetun-panels" id="gluetunPanels" style="display:none;">
+                        <div class="gluetun-panels-row">
+                            <!-- Public IP / Geolocation panel -->
+                            <div class="ginfo-panel" id="panelIpInfo">
+                                <div class="ginfo-panel-header">
+                                    <span class="ginfo-panel-icon"><i class="fas fa-globe"></i></span>
+                                    <strong class="ginfo-panel-title" data-i18n="panelPublicIp">Public IP Info</strong>
+                                </div>
+                                <div class="ginfo-panel-body" id="ipInfoBody">
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelPublicIp">Public IP</span><span class="ginfo-value" id="giIp">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelCountry">Country</span><span class="ginfo-value" id="giCountry">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelCity">City</span><span class="ginfo-value" id="giCity">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelOrg">Organisation</span><span class="ginfo-value" id="giOrg">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelPostalCode">Postal Code</span><span class="ginfo-value" id="giPostalCode">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelTimezone">Timezone</span><span class="ginfo-value" id="giTimezone">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- VPN Connection panel -->
+                            <div class="ginfo-panel" id="panelVpnInfo">
+                                <div class="ginfo-panel-header">
+                                    <span class="ginfo-panel-icon"><i class="fas fa-lock"></i></span>
+                                    <strong class="ginfo-panel-title" data-i18n="panelVpnConnection">VPN Connection</strong>
+                                </div>
+                                <div class="ginfo-panel-body" id="vpnInfoBody">
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelStatus">Status</span><span class="ginfo-value" id="gvStatus">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelProvider">Provider</span><span class="ginfo-value" id="gvProvider">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelServer">Server</span><span class="ginfo-value ginfo-value--mono" id="gvServer">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelIpType">Type</span><span class="ginfo-value" id="gvIpType">—</span></div>
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelProtocol">Protocol</span><span class="ginfo-value" id="gvProtocol">—</span></div>
+                                    <div class="ginfo-protocol-badge" id="gvProtocolBadge" style="display:none;">
+                                        <img src="icons/wireguard-icon.svg" alt="WireGuard" class="protocol-logo" id="gvWireguardLogo">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="gluetun-panels-row">
+                            <!-- Port Forwarding panel -->
+                            <div class="ginfo-panel" id="panelPortForwarding">
+                                <div class="ginfo-panel-header">
+                                    <span class="ginfo-panel-icon"><i class="fas fa-random"></i></span>
+                                    <strong class="ginfo-panel-title" data-i18n="panelPortForwarding">Port Forwarding</strong>
+                                </div>
+                                <div class="ginfo-panel-body" id="portInfoBody">
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelForwardedPort">Forwarded Port</span><span class="ginfo-value" id="gpPort">—</span></div>
+                                </div>
+                            </div>
+
+                            <!-- DNS panel -->
+                            <div class="ginfo-panel" id="panelDns">
+                                <div class="ginfo-panel-header">
+                                    <span class="ginfo-panel-icon"><i class="fas fa-network-wired"></i></span>
+                                    <strong class="ginfo-panel-title" data-i18n="panelDns">DNS</strong>
+                                </div>
+                                <div class="ginfo-panel-body" id="dnsInfoBody">
+                                    <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelStatus">Status</span><span class="ginfo-value" id="gdStatus">—</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status History -->
+                    <div class="vpn-history-panel" id="vpnHistoryPanel" style="display:none;">
+                        <div class="vpn-history-header">
+                            <span class="vpn-history-icon"><i class="fas fa-chart-bar"></i></span>
+                            <strong class="vpn-history-title" data-i18n="panelStatusHistory">Status History (last 30 polls)</strong>
+                        </div>
+                        <div class="vpn-history-squares" id="vpnHistorySquares"></div>
+                        <div class="vpn-history-legend">
+                            <span class="vpn-history-legend-item"><span class="vpn-sq sq-connected"></span> <span data-i18n="histConnected">Connected</span></span>
+                            <span class="vpn-history-legend-item"><span class="vpn-sq sq-paused"></span> <span data-i18n="histPaused">Paused</span></span>
+                            <span class="vpn-history-legend-item"><span class="vpn-sq sq-disconnected"></span> <span data-i18n="histDisconnected">Disconnected</span></span>
+                            <span class="vpn-history-legend-item"><span class="vpn-sq sq-unknown"></span> <span data-i18n="histUnknown">Unknown</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Map -->
+                    <div class="current-config-map" id="currentMapWrapper" style="display:none;">
+                        <div id="currentMap"></div>
                     </div>
                 </div>
             </div>

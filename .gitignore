@@ -9,3 +9,5 @@ config-local/
 # Dependencies
 node_modules/
 npm-debug.log*
+# Local docker-compose (may contain credentials / personal config)
+docker-compose.yml

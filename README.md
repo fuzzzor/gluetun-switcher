@@ -147,6 +147,9 @@ The following environment variables are required to enable the new authenticatio
 - `WIREGUARD_DIR`: (Required) The path *inside the container* where your `.conf` files are located. This path must match the destination of the volume you mount.
 - `CONTAINER_TO_RESTART`: (Required) The name(s) of the Docker container(s) to restart after a configuration change. Separate names with a comma (e.g., `gluetun,qbittorrent`).
 - `TZ`: (Optional) The timezone to use for timestamps in the history (e.g., `Europe/Paris`).
+- `GLUETUN_API_URL`: (Optional) Base URL of the Gluetun HTTP control API. Used to display VPN status, DNS status, server info and forwarded port in the info panels. Typically `http://gluetun:8000` when both containers share the same Docker network, or `http://<HOST_IP>:8000` otherwise. Defaults to `http://localhost:8000`.
+- `GEOLOCATION_API_URL`: (Optional) URL of the public IP geolocation endpoint. Defaults to `http://localhost:8000/v1/publicip/ip` (Gluetun's built-in endpoint). Set to the same host as `GLUETUN_API_URL` with the path `/v1/publicip/ip`.
+- `MAP_TILE_URL`: (Optional) MapLibre tile style URL for the embedded map. Requires a valid MapTiler API key.
 
 ### Volumes
 

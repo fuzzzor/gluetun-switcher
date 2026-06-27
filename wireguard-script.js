@@ -39,6 +39,12 @@ const api = {
     activateConfig: (sourcePath) => api.post('activate-config', { sourcePath }),
     getLocations: () => api.get('locations'),
     getMapConfig: () => api.get('config/map'),
+    // Gluetun API proxies
+    getGluetunVpnStatus: () => api.get('gluetun/vpn-status'),
+    getGluetunDnsStatus: () => api.get('gluetun/dns-status'),
+    getGluetunPortForwarding: () => api.get('gluetun/portforwarding'),
+    getGluetunVpnType: () => api.get('gluetun/vpn-type'),
+    getGluetunVpnHistory: () => api.get('gluetun/vpn-history'),
 };
 
 
@@ -402,7 +408,9 @@ async function fetchIpInfo(waitForChange = false) {
                     latitude: lat || data.latitude || data.lat,
                     longitude: lon || data.longitude || data.lon || data.lng,
                     country: data.country || data.country_name || translations.notAvailable,
-                    city: data.city || translations.notAvailable
+                    city: data.city || translations.notAvailable,
+                    org: data.organization || data.org || data.isp || null,
+                    postal: data.postal || data.postal_code || data.zip || null
                 };
                 
                 return currentIpInfo;
@@ -426,6 +434,171 @@ async function fetchIpInfo(waitForChange = false) {
     return currentIpInfo;
 }
 
+// ── Populate Gluetun info panels ──────────────────────────────────────────────
+// locationInfo: result of getLocationInfo(configName) — used to fill Provider/Country/City
+// configName: the active .conf filename (e.g. "protonvpn-us-denver.conf")
+async function loadGluetunPanels(ipInfo, locationInfo, configName) {
+    const panelsEl = document.getElementById('gluetunPanels');
+    const mapWrapper = document.getElementById('currentMapWrapper');
+    if (!panelsEl) return;
+
+    // Helper: set text + optional status colour class
+    function setVal(id, text, statusClass) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = text || '—';
+        el.className = 'ginfo-value' + (statusClass ? ` ${statusClass}` : '');
+    }
+
+    function resolveStatusClass(val) {
+        if (!val) return 'status-unknown';
+        const v = String(val).toLowerCase();
+        if (v === 'running') return 'status-running';
+        if (v === 'stopped' || v === 'disabled') return 'status-stopped';
+        return 'status-unknown';
+    }
+
+    // Capitalise first letter of a string
+    function capitalize(str) {
+        if (!str) return str;
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    // Detect IPv4 / IPv6 from an IP or hostname string
+    function detectIpType(host) {
+        if (!host) return null;
+        if (/^[\da-fA-F:]+$/.test(host) && host.includes(':')) return 'IPv6';
+        if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return 'IPv4';
+        return null; // hostname — unknown until resolved
+    }
+
+    // ── IP / Geolocation ──────────────────────────────────────────────────────
+    if (ipInfo) {
+        setVal('giIp',         ipInfo.ip);
+        setVal('giCountry',    ipInfo.country);
+        setVal('giCity',       ipInfo.city);
+        setVal('giOrg',        ipInfo.org);
+        setVal('giPostalCode', ipInfo.postal);
+        setVal('giTimezone',   ipInfo.timezone);
+    }
+
+    // ── VPN status (/v1/vpn/status — works for WireGuard AND OpenVPN) ─────────
+    try {
+        const vpnStatus = await api.getGluetunVpnStatus();
+        const status = vpnStatus.status || vpnStatus.Status || null;
+        setVal('gvStatus', status, resolveStatusClass(status));
+    } catch (e) {
+        setVal('gvStatus', 'N/A', 'status-unknown');
+        console.warn('Gluetun VPN status unavailable:', e.message);
+    }
+
+    // ── Protocol + Provider + Server + IP Type — read from wg0.conf ──────────
+    try {
+        const vpnType = await api.getGluetunVpnType();
+        if (vpnType) {
+            // Protocol (capitalized)
+            if (vpnType.vpn_type) setVal('gvProtocol', capitalize(vpnType.vpn_type));
+
+            // Server: actual Endpoint host from conf
+            const serverHost = vpnType.server_host || null;
+            if (serverHost) {
+                setVal('gvServer', serverHost);
+                // IPv4 / IPv6 detection
+                const ipType = detectIpType(serverHost);
+                setVal('gvIpType', ipType || '—');
+            } else if (configName) {
+                setVal('gvServer', configName.replace(/\.conf$/, ''));
+                setVal('gvIpType', '—');
+            }
+
+            // Provider (capitalized)
+            let providerText = null;
+            if (vpnType.provider) {
+                providerText = capitalize(vpnType.provider);
+            } else if (configName) {
+                const nameLower = configName.toLowerCase().replace(/\.conf$/, '');
+                const knownProviders = ['protonvpn', 'mullvad', 'nordvpn', 'expressvpn', 'surfshark', 'pia', 'ipvanish', 'cyberghost', 'hidemyass', 'privado'];
+                const detected = knownProviders.find(p => nameLower.includes(p)) || null;
+                if (detected) providerText = capitalize(detected);
+            }
+            if (providerText) setVal('gvProvider', providerText);
+
+            // Show WireGuard logo badge if protocol is wireguard
+            const badge = document.getElementById('gvProtocolBadge');
+            if (badge && vpnType.vpn_type && vpnType.vpn_type.toLowerCase() === 'wireguard') {
+                badge.style.display = 'flex';
+            } else if (badge) {
+                badge.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        // Fallback to config name only
+        if (configName) setVal('gvServer', configName.replace(/\.conf$/, ''));
+        console.warn('VPN type/provider detection unavailable:', e.message);
+    }
+
+    // ── DNS status ────────────────────────────────────────────────────────────
+    try {
+        const dnsStatus = await api.getGluetunDnsStatus();
+        const status = dnsStatus.status || dnsStatus.Status || null;
+        setVal('gdStatus', status, resolveStatusClass(status));
+    } catch (e) {
+        setVal('gdStatus', 'N/A', 'status-unknown');
+        console.warn('Gluetun DNS status unavailable:', e.message);
+    }
+
+    // ── Port forwarding ───────────────────────────────────────────────────────
+    try {
+        const pf = await api.getGluetunPortForwarding();
+        const port = pf.port || pf.Port || pf.forwarded_port || null;
+        setVal('gpPort', port ? String(port) : '—');
+    } catch (e) {
+        setVal('gpPort', '—');
+        console.warn('Gluetun port forwarding unavailable:', e.message);
+    }
+
+    // ── VPN Status History ────────────────────────────────────────────────────
+    try {
+        const histResult = await api.getGluetunVpnHistory();
+        if (histResult && histResult.history) {
+            renderVpnHistory(histResult.history);
+        }
+    } catch (e) {
+        console.warn('VPN history unavailable:', e.message);
+    }
+
+    // Show panels & map
+    panelsEl.style.display = 'flex';
+    if (mapWrapper) mapWrapper.style.display = 'block';
+}
+
+// Render VPN status history squares
+function renderVpnHistory(history) {
+    const panel = document.getElementById('vpnHistoryPanel');
+    const squaresEl = document.getElementById('vpnHistorySquares');
+    if (!panel || !squaresEl) return;
+
+    if (!history || history.length === 0) {
+        panel.style.display = 'none';
+        return;
+    }
+
+    const colorMap = {
+        connected:    'sq-connected',
+        paused:       'sq-paused',
+        disconnected: 'sq-disconnected',
+        unknown:      'sq-unknown'
+    };
+
+    squaresEl.innerHTML = history.map(entry => {
+        const cls = colorMap[entry.status] || 'sq-unknown';
+        const ts = entry.ts ? new Date(entry.ts).toLocaleTimeString() : '';
+        return `<span class="vpn-sq ${cls}" title="${entry.status} — ${ts}"></span>`;
+    }).join('');
+
+    panel.style.display = 'block';
+}
+
 // Checking the current configuration
 async function checkCurrentConfig() {
     try {
@@ -433,55 +606,36 @@ async function checkCurrentConfig() {
 
         if (configInfo.success) {
             const location = getLocationInfo(configInfo.name);
-            const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
-            
-            // Show loading state first
+
+            // Show loading banner
             currentConfig.innerHTML = `
-                <div class="current-config-content">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <div class="current-config-text">
-                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
-                        <p>Récupération des informations IP...</p>
-                    </div>
-                </div>
-                <div class="current-config-map">
-                    <div id="currentMap"></div>
+                <span class="current-config-spinner"><i class="fas fa-circle-notch fa-spin"></i></span>
+                <div>
+                    <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                    <p>Fetching VPN information…</p>
                 </div>
             `;
             currentConfig.style.background = '';
-            
+
             // Fetch IP info
-            const ipInfo = await fetchIpInfo(false); // Normal fetch for config check
-            
-            // Build the display with IP and timezone info
-            let ipInfoHTML = '';
-            if (ipInfo && (ipInfo.timezone || ipInfo.ip)) {
-                const timezone = ipInfo.timezone || translations.timezoneNotAvailable;
-                const ipAddress = ipInfo.ip || translations.ipNotAvailable;
-                ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>IP: ${ipAddress}</strong></p>`;
-            } else {
-                ipInfoHTML = `<p>${locationString} - ${translations.timezoneNotAvailable}</p><p><strong>IP: ${translations.notAvailable}</strong></p>`;
-            }
-            
-            // Update the display with final info
+            const ipInfo = await fetchIpInfo(false);
+
+            // Update banner with IP
+            const ipAddress = (ipInfo && ipInfo.ip) ? ipInfo.ip : (translations.notAvailable || 'N/A');
             currentConfig.innerHTML = `
-                <div class="current-config-content">
-                    <i class="fas fa-check-circle"></i>
-                    <div class="current-config-text">
-                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
-                        ${ipInfoHTML}
-                    </div>
-                </div>
-                <div class="current-config-map">
-                    <div id="currentMap"></div>
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                    <p>Public IP: <strong>${ipAddress}</strong></p>
                 </div>
             `;
-            
-            // Initialize the map after the DOM is updated
-            setTimeout(() => {
-                initCurrentMap(location);
-            }, 200);
-            
+
+            // Populate panels
+            await loadGluetunPanels(ipInfo, location, configInfo.name);
+
+            // Initialize map
+            setTimeout(() => initCurrentMap(location), 200);
+
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>
@@ -492,7 +646,6 @@ async function checkCurrentConfig() {
             `;
             currentConfig.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
         } else {
-            // Handle read errors or other server errors
             throw new Error(configInfo.error || translations.unknownErrorChecking);
         }
     } catch (error) {
@@ -677,55 +830,35 @@ async function checkCurrentConfigWithIpWait() {
 
         if (configInfo.success) {
             const location = getLocationInfo(configInfo.name);
-            const locationString = location.city ? `${location.name}, ${location.city}` : location.name;
-            
-            // Show waiting state
+
+            // Show waiting banner
             currentConfig.innerHTML = `
-                <div class="current-config-content">
-                    <i class="fas fa-spinner fa-spin"></i>
-                    <div class="current-config-text">
-                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
-                        <p>Attente du changement d'IP...</p>
-                    </div>
-                </div>
-                <div class="current-config-map">
-                    <div id="currentMap"></div>
+                <span class="current-config-spinner"><i class="fas fa-circle-notch fa-spin"></i></span>
+                <div>
+                    <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                    <p>Waiting for IP change…</p>
                 </div>
             `;
             currentConfig.style.background = '';
-            
+
             // Fetch IP info with smart waiting for change
-            const ipInfo = await fetchIpInfo(true); // Wait for IP change
-            
-            // Build the display with IP and timezone info
-            let ipInfoHTML = '';
-            if (ipInfo && (ipInfo.timezone || ipInfo.ip)) {
-                const timezone = ipInfo.timezone || translations.timezoneNotAvailable;
-                const ipAddress = ipInfo.ip || translations.ipNotAvailable;
-                ipInfoHTML = `<p>${locationString} - ${timezone}</p><p><strong>IP: ${ipAddress}</strong></p>`;
-            } else {
-                ipInfoHTML = `<p>${locationString} - ${translations.timezoneNotAvailable}</p><p><strong>IP: ${translations.notAvailable}</strong></p>`;
-            }
-            
-            // Update the display with final info
+            const ipInfo = await fetchIpInfo(true);
+
+            const ipAddress = (ipInfo && ipInfo.ip) ? ipInfo.ip : (translations.notAvailable || 'N/A');
             currentConfig.innerHTML = `
-                <div class="current-config-content">
-                    <i class="fas fa-check-circle"></i>
-                    <div class="current-config-text">
-                        <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
-                        ${ipInfoHTML}
-                    </div>
-                </div>
-                <div class="current-config-map">
-                    <div id="currentMap"></div>
+                <i class="fas fa-check-circle"></i>
+                <div>
+                    <h4>${location.flag} ${configInfo.name} (${translations.active})</h4>
+                    <p>Public IP: <strong>${ipAddress}</strong></p>
                 </div>
             `;
-            
-            // Initialize the map after the DOM is updated
-            setTimeout(() => {
-                initCurrentMap(location);
-            }, 200);
-            
+
+            // Populate panels
+            await loadGluetunPanels(ipInfo, location, configInfo.name);
+
+            // Initialize map
+            setTimeout(() => initCurrentMap(location), 200);
+
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>

@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/fuzzzor/gluetun-switcher:latest
+    container_name: Gluetun-switcher
+    restart: unless-stopped
+    ports:
+      # Access the app via http://localhost:3003
+      - "3003:3003"
+    environment:
+      - WIREGUARD_DIR=/etc/wireguard
+      - CONTAINER_TO_RESTART=gluetun,qbittorrent
+      - NODE_ENV=production
+      - SESSION_SECRET=CHANGE_ME_RANDOM_64_CHARS
+      - HTTPS_ENABLED=false
+      - PASSWORD_MIN_LENGTH=8
+      - PASSWORD_MAX_ATTEMPTS=5
+      # Geolocation & map — replace with your Gluetun container name/IP and your MapTiler key
+      - GEOLOCATION_API_URL=http://gluetun:8000/v1/publicip/ip
+      - MAP_TILE_URL=https://api.maptiler.com/maps/streets/style.json?key={ADD_YOUR_MAPTILER_KEY}
+      # Gluetun HTTP control API — used for VPN/DNS/port-forwarding info panels
+      # Use the Gluetun container name if on the same Docker network, or http://<HOST_IP>:8000
+      - GLUETUN_API_URL=http://gluetun:8000
+    volumes:
+      - ./certs:/certs:ro
+      # Application config & history persistence
+      - /your/host/path/gluetun-switcher/config:/usr/src/app/config
+      # Mount the folder containing your WireGuard .conf files
+      - /your/host/path/gluetun/wireguard:/etc/wireguard
+      # (Optional) Gluetun server JSON files — enables provider detection from VPN server IP
+      - /your/host/path/gluetun/servers:/gluetun-servers:ro
+      # Required to allow restarting other Docker containers
+      - /var/run/docker.sock:/var/run/docker.sock
