@@ -331,12 +331,23 @@
                     <h2><i class="fas fa-check-circle"></i> <span data-i18n="currentConfig">Current Configuration</span></h2>
                 </div>
                 <div class="card-body">
-                    <!-- VPN status banner -->
-                    <div id="currentConfig" class="current-config">
-                        <span class="current-config-spinner"><i class="fas fa-circle-notch fa-spin"></i></span>
-                        <div>
-                            <h4 data-i18n="checking">Checking...</h4>
-                            <p data-i18n="readingConfig">Reading active configuration</p>
+                    <!-- VPN status banner + control buttons -->
+                    <div class="current-config-wrapper">
+                        <div id="currentConfig" class="current-config">
+                            <span class="current-config-spinner"><i class="fas fa-circle-notch fa-spin"></i></span>
+                            <div style="flex:1;">
+                                <h4 data-i18n="checking">Checking...</h4>
+                                <p data-i18n="readingConfig">Reading active configuration</p>
+                            </div>
+                            <span class="panel-status-badge banner-status-badge" id="badgeBanner"></span>
+                        </div>
+                        <div class="vpn-control-buttons">
+                            <button id="vpnStartBtn" class="btn-vpn btn-vpn-start" title="Start VPN">
+                                <i class="fas fa-play"></i>
+                            </button>
+                            <button id="vpnStopBtn" class="btn-vpn btn-vpn-stop" title="Stop VPN">
+                                <i class="fas fa-stop"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -348,6 +359,7 @@
                                 <div class="ginfo-panel-header">
                                     <span class="ginfo-panel-icon"><i class="fas fa-globe"></i></span>
                                     <strong class="ginfo-panel-title" data-i18n="panelPublicIp">Public IP Info</strong>
+                                    <span class="panel-status-badge" id="badgeIpInfo"></span>
                                 </div>
                                 <div class="ginfo-panel-body" id="ipInfoBody">
                                     <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelPublicIp">Public IP</span><span class="ginfo-value" id="giIp">—</span></div>
@@ -364,6 +376,7 @@
                                 <div class="ginfo-panel-header">
                                     <span class="ginfo-panel-icon"><i class="fas fa-lock"></i></span>
                                     <strong class="ginfo-panel-title" data-i18n="panelVpnConnection">VPN Connection</strong>
+                                    <span class="panel-status-badge" id="badgeVpnInfo"></span>
                                 </div>
                                 <div class="ginfo-panel-body" id="vpnInfoBody">
                                     <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelStatus">Status</span><span class="ginfo-value" id="gvStatus">—</span></div>
@@ -384,6 +397,7 @@
                                 <div class="ginfo-panel-header">
                                     <span class="ginfo-panel-icon"><i class="fas fa-random"></i></span>
                                     <strong class="ginfo-panel-title" data-i18n="panelPortForwarding">Port Forwarding</strong>
+                                    <span class="panel-status-badge" id="badgePortForwarding"></span>
                                 </div>
                                 <div class="ginfo-panel-body" id="portInfoBody">
                                     <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelForwardedPort">Forwarded Port</span><span class="ginfo-value" id="gpPort">—</span></div>
@@ -395,6 +409,7 @@
                                 <div class="ginfo-panel-header">
                                     <span class="ginfo-panel-icon"><i class="fas fa-network-wired"></i></span>
                                     <strong class="ginfo-panel-title" data-i18n="panelDns">DNS</strong>
+                                    <span class="panel-status-badge" id="badgeDns"></span>
                                 </div>
                                 <div class="ginfo-panel-body" id="dnsInfoBody">
                                     <div class="ginfo-row"><span class="ginfo-label" data-i18n="labelStatus">Status</span><span class="ginfo-value" id="gdStatus">—</span></div>
@@ -412,7 +427,6 @@
                         <div class="vpn-history-squares" id="vpnHistorySquares"></div>
                         <div class="vpn-history-legend">
                             <span class="vpn-history-legend-item"><span class="vpn-sq sq-connected"></span> <span data-i18n="histConnected">Connected</span></span>
-                            <span class="vpn-history-legend-item"><span class="vpn-sq sq-paused"></span> <span data-i18n="histPaused">Paused</span></span>
                             <span class="vpn-history-legend-item"><span class="vpn-sq sq-disconnected"></span> <span data-i18n="histDisconnected">Disconnected</span></span>
                             <span class="vpn-history-legend-item"><span class="vpn-sq sq-unknown"></span> <span data-i18n="histUnknown">Unknown</span></span>
                         </div>

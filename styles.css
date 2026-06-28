@@ -660,6 +660,65 @@ body {
     font-style: italic;
 }
 
+/* VPN banner wrapper: banner + control buttons side by side */
+.current-config-wrapper {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.current-config-wrapper .current-config {
+    flex: 1;
+    margin-bottom: 0;
+}
+
+/* VPN start / stop icon buttons */
+.vpn-control-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.btn-vpn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: var(--white);
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.btn-vpn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.btn-vpn-start {
+    background: #16a34a;
+}
+
+.btn-vpn-start:hover:not(:disabled) {
+    background: #15803d;
+    transform: scale(1.08);
+}
+
+.btn-vpn-stop {
+    background: #dc2626;
+}
+
+.btn-vpn-stop:hover:not(:disabled) {
+    background: #b91c1c;
+    transform: scale(1.08);
+}
+
 .current-config {
     background: linear-gradient(135deg, #10b981, #059669);
     color: var(--white);
@@ -723,6 +782,43 @@ body {
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--white);
+    flex: 1;
+}
+
+/* ── Panel & banner status badges (OK / WARN pill outline) ── */
+.panel-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 10px;
+    border-radius: 999px;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: transparent;
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: rgba(255,255,255,0.4);
+    transition: border-color 0.2s, color 0.2s;
+    min-width: 40px;
+    text-align: center;
+}
+
+.panel-status-badge.badge-ok {
+    border-color: #22c55e;
+    color: #22c55e;
+}
+
+.panel-status-badge.badge-warn {
+    border-color: #f59e0b;
+    color: #f59e0b;
+}
+
+/* Banner badge — same style, slightly bigger font */
+.banner-status-badge {
+    font-size: 0.75rem;
+    padding: 3px 12px;
+    margin-left: auto;
 }
 
 .ginfo-panel-body {
@@ -868,6 +964,8 @@ body {
     height: 220px;
     border-radius: 10px;
     overflow: hidden;
+    border: 2px solid var(--border-color);
+    box-shadow: var(--shadow);
 }
 
 #currentMap {

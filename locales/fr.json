@@ -132,5 +132,9 @@
   "networkError": "Erreur réseau ou serveur inaccessible",
   "notAvailable": "Non disponible",
   "timezoneNotAvailable": "Timezone non disponible",
-  "ipNotAvailable": "IP non disponible"
+  "ipNotAvailable": "IP non disponible",
+  "vpnStarted": "VPN démarré avec succès",
+  "vpnStopped": "VPN arrêté",
+  "vpnControlError": "Erreur de contrôle VPN : {error}",
+  "notForwarded": "Non redirigé"
 }

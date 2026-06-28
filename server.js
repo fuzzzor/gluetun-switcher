@@ -162,12 +162,27 @@ app.get('/api/geolocation', async (req, res) => {
   }
 });
 
-// Helper to call Gluetun API
+// Helper to call Gluetun API (GET)
 async function fetchGluetunApi(path) {
   const base = (process.env.GLUETUN_API_URL || 'http://localhost:8000').replace(/\/$/, '');
   const response = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(5000) });
   if (!response.ok) throw new Error(`Gluetun API ${path} responded with ${response.status}`);
   return response.json();
+}
+
+// Helper to call Gluetun API (PUT)
+async function putGluetunApi(path, body) {
+  const base = (process.env.GLUETUN_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+  const response = await fetch(`${base}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10000)
+  });
+  if (!response.ok) throw new Error(`Gluetun API ${path} responded with ${response.status}`);
+  // Some Gluetun PUT endpoints return empty body
+  const text = await response.text();
+  return text ? JSON.parse(text) : { success: true };
 }
 
 // Proxy: Gluetun VPN status (works for both WireGuard and OpenVPN)
@@ -200,6 +215,30 @@ app.get('/api/gluetun/portforwarding', async (req, res) => {
     const data = await fetchGluetunApi('/v1/portforwarding/status');
     res.json({ success: true, ...data });
   } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Proxy: Start Gluetun VPN (PUT /v1/vpn/status with {"status":"running"})
+app.put('/api/gluetun/vpn-start', async (req, res) => {
+  try {
+    const data = await putGluetunApi('/v1/vpn/status', { status: 'running' });
+    console.log('[Gluetun] vpn-start response:', JSON.stringify(data));
+    res.json({ success: true, ...data });
+  } catch (error) {
+    console.error('[Gluetun] vpn-start error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Proxy: Stop Gluetun VPN (PUT /v1/vpn/status with {"status":"stopped"})
+app.put('/api/gluetun/vpn-stop', async (req, res) => {
+  try {
+    const data = await putGluetunApi('/v1/vpn/status', { status: 'stopped' });
+    console.log('[Gluetun] vpn-stop response:', JSON.stringify(data));
+    res.json({ success: true, ...data });
+  } catch (error) {
+    console.error('[Gluetun] vpn-stop error:', error.message);
     res.status(500).json({ success: false, error: error.message });
   }
 });

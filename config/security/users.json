@@ -2,8 +2,8 @@
   "users": [
     {
       "username": "admin",
-      "passwordHash": "$argon2id$v=19$m=65536,t=3,p=4$RRRZnYaZv4HZ+MmEYb6oog$6KAQajL09S2KjK/Uj2LL0Yv090LFNPLAu/E2kuZBSQ8",
-      "mustChangePassword": true,
+      "passwordHash": "$argon2id$v=19$m=65536,t=3,p=4$DcQZvTAKb/0Og5qPsRYRgA$SuSM7cL+vjXzIwu9lHkUAIKFt0WuNH062n2C/+XvNpk",
+      "mustChangePassword": false,
       "failedAttempts": 0,
       "lockedUntil": null
     }

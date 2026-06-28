@@ -45,6 +45,9 @@ const api = {
     getGluetunPortForwarding: () => api.get('gluetun/portforwarding'),
     getGluetunVpnType: () => api.get('gluetun/vpn-type'),
     getGluetunVpnHistory: () => api.get('gluetun/vpn-history'),
+    // VPN start / stop
+    vpnStart: () => api._request('PUT', 'gluetun/vpn-start'),
+    vpnStop:  () => api._request('PUT', 'gluetun/vpn-stop'),
 };
 
 
@@ -69,6 +72,8 @@ const currentConfig = document.getElementById('currentConfig');
 const operationHistoryContainer = document.getElementById('operationHistory');
 const notificationsContainer = document.getElementById('notifications');
 const clearHistoryBtn = document.getElementById('clearHistoryBtn'); // New button
+const vpnStartBtn = document.getElementById('vpnStartBtn');
+const vpnStopBtn  = document.getElementById('vpnStopBtn');
 
 const confirmModal = document.getElementById('confirmModal');
 const confirmMessage = document.getElementById('confirmMessage');
@@ -179,6 +184,14 @@ function initializeEventListeners() {
         clearHistoryBtn.addEventListener('click', clearOperationHistory);
     }
 
+    // VPN start / stop buttons
+    if (vpnStartBtn) {
+        vpnStartBtn.addEventListener('click', () => controlVpn('start'));
+    }
+    if (vpnStopBtn) {
+        vpnStopBtn.addEventListener('click', () => controlVpn('stop'));
+    }
+
     // Modal events
     confirmYes.addEventListener('click', executeActivation);
     confirmNo.addEventListener('click', hideConfirmationModal);
@@ -234,6 +247,40 @@ function initializeEventListeners() {
             toggle();
         });
     });
+}
+
+// VPN start / stop control
+async function controlVpn(action) {
+    const btn = action === 'start' ? vpnStartBtn : vpnStopBtn;
+    const icon = btn ? btn.querySelector('i') : null;
+    const originalClass = icon ? icon.className : '';
+
+    try {
+        // Visual feedback: spinner
+        if (btn) btn.disabled = true;
+        if (icon) icon.className = 'fas fa-circle-notch fa-spin';
+
+        if (action === 'start') {
+            await api.vpnStart();
+            showNotification(translations.vpnStarted || 'VPN started', 'success');
+            addToHistory({ type: 'success', message: translations.vpnStarted || 'VPN started', timestamp: new Date() });
+        } else {
+            await api.vpnStop();
+            showNotification(translations.vpnStopped || 'VPN stopped', 'info');
+            addToHistory({ type: 'info', message: translations.vpnStopped || 'VPN stopped', timestamp: new Date() });
+        }
+
+        // Refresh status display after a short delay (give Gluetun time to react)
+        setTimeout(() => checkCurrentConfig(), 2000);
+
+    } catch (error) {
+        const msg = (translations.vpnControlError || 'VPN control error: {error}').replace('{error}', error.message);
+        showNotification(msg, 'error');
+        addToHistory({ type: 'error', message: msg, timestamp: new Date() });
+    } finally {
+        if (btn) btn.disabled = false;
+        if (icon) icon.className = originalClass;
+    }
 }
 
 // Loading WireGuard files
@@ -550,12 +597,18 @@ async function loadGluetunPanels(ipInfo, locationInfo, configName) {
     }
 
     // ── Port forwarding ───────────────────────────────────────────────────────
+    let portForwarded = false;
     try {
         const pf = await api.getGluetunPortForwarding();
         const port = pf.port || pf.Port || pf.forwarded_port || null;
-        setVal('gpPort', port ? String(port) : '—');
+        if (port) {
+            setVal('gpPort', String(port));
+            portForwarded = true;
+        } else {
+            setVal('gpPort', translations.notForwarded || 'Not forwarded');
+        }
     } catch (e) {
-        setVal('gpPort', '—');
+        setVal('gpPort', translations.notForwarded || 'Not forwarded');
         console.warn('Gluetun port forwarding unavailable:', e.message);
     }
 
@@ -568,6 +621,38 @@ async function loadGluetunPanels(ipInfo, locationInfo, configName) {
     } catch (e) {
         console.warn('VPN history unavailable:', e.message);
     }
+
+    // ── Status badges ─────────────────────────────────────────────────────────
+    function setPanelBadge(id, isOk) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.classList.remove('badge-ok', 'badge-warn');
+        el.classList.add(isOk ? 'badge-ok' : 'badge-warn');
+        el.textContent = isOk ? 'OK' : 'WARN';
+    }
+
+    // IP Info panel: OK if we got a real IP
+    const ipOk = !!(ipInfo && ipInfo.ip && ipInfo.ip !== (translations.notAvailable || 'N/A'));
+    setPanelBadge('badgeIpInfo', ipOk);
+
+    // VPN Connection panel: OK if status is "running"
+    const vpnStatusEl = document.getElementById('gvStatus');
+    const vpnStatusText = vpnStatusEl ? vpnStatusEl.textContent.toLowerCase() : '';
+    const vpnOk = vpnStatusText === 'running';
+    setPanelBadge('badgeVpnInfo', vpnOk);
+
+    // Port Forwarding panel: warn if not forwarded
+    setPanelBadge('badgePortForwarding', portForwarded);
+
+    // DNS panel: OK if status is "running"
+    const dnsStatusEl = document.getElementById('gdStatus');
+    const dnsStatusText = dnsStatusEl ? dnsStatusEl.textContent.toLowerCase() : '';
+    const dnsOk = dnsStatusText === 'running';
+    setPanelBadge('badgeDns', dnsOk);
+
+    // Global banner badge: OK if VPN running + DNS running
+    const bannerOk = vpnOk && dnsOk;
+    setPanelBadge('badgeBanner', bannerOk);
 
     // Show panels & map
     panelsEl.style.display = 'flex';
@@ -587,7 +672,6 @@ function renderVpnHistory(history) {
 
     const colorMap = {
         connected:    'sq-connected',
-        paused:       'sq-paused',
         disconnected: 'sq-disconnected',
         unknown:      'sq-unknown'
     };
@@ -641,12 +725,13 @@ async function checkCurrentConfig() {
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>
-                <div>
+                <div style="flex:1;">
                     <h4>${translations.noActiveConfig}</h4>
                     <p>${translations.wg0NotFound}</p>
                 </div>
             `;
             currentConfig.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+            showLogoInMap();
         } else {
             throw new Error(configInfo.error || translations.unknownErrorChecking);
         }
@@ -654,14 +739,28 @@ async function checkCurrentConfig() {
         console.error('Error in checkCurrentConfig:', error);
         currentConfig.innerHTML = `
             <i class="fas fa-times-circle"></i>
-            <div>
+            <div style="flex:1;">
                 <h4>${translations.errorChecking}</h4>
                 <p>${translations.cantCheck}</p>
                 <p style="color: red; font-size: 0.8em; margin-top: 10px;">Debug: ${error.message}</p>
             </div>
         `;
         currentConfig.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+        showLogoInMap();
     }
+}
+
+// Show the app logo inside the map frame (when VPN is stopped / Gluetun unavailable)
+function showLogoInMap() {
+    const mapWrapper = document.getElementById('currentMapWrapper');
+    const mapContainer = document.getElementById('currentMap');
+    if (!mapWrapper || !mapContainer) return;
+    mapContainer.innerHTML = `
+        <div style="height:100%;display:flex;align-items:center;justify-content:center;background:var(--light-bg);border-radius:10px;">
+            <img src="icons/logoswitcher.png" alt="Gluetun Switcher" style="max-width:60%;max-height:60%;object-fit:contain;opacity:0.7;">
+        </div>
+    `;
+    mapWrapper.style.display = 'block';
 }
 
 
@@ -864,12 +963,13 @@ async function checkCurrentConfigWithIpWait() {
         } else if (configInfo.reason === 'not_found') {
             currentConfig.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>
-                <div>
+                <div style="flex:1;">
                     <h4>${translations.noActiveConfig}</h4>
                     <p>${translations.wg0NotFound}</p>
                 </div>
             `;
             currentConfig.style.background = 'linear-gradient(135deg, #f59e0b, #d97706)';
+            showLogoInMap();
         } else {
             throw new Error(configInfo.error || translations.unknownErrorChecking);
         }
@@ -877,13 +977,14 @@ async function checkCurrentConfigWithIpWait() {
         console.error('Error in checkCurrentConfigWithIpWait:', error);
         currentConfig.innerHTML = `
             <i class="fas fa-times-circle"></i>
-            <div>
+            <div style="flex:1;">
                 <h4>${translations.errorChecking}</h4>
                 <p>${translations.cantCheck}</p>
                 <p style="color: red; font-size: 0.8em; margin-top: 10px;">Debug: ${error.message}</p>
             </div>
         `;
         currentConfig.style.background = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+        showLogoInMap();
     }
 }
 
